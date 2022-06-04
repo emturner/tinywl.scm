@@ -9,10 +9,21 @@
 (define wlroots (load-foreign-library "libwlroots"))
 
 ;; Wrappers for 'wayland-server-core.h'
-;;(define wl-display-create
-;;  (foreign-library-function wlroots "wl_display_create"
-;;			    #:return-type *
-;;			    #:arg-types '()))
+(define-wrapped-pointer-type wl-display
+  wl-display?
+  wrap-wl-display unwrap-wl-display
+  (lambda (wl-d prt)
+    (format prt "#<wl-display at ~x>"
+	    (pointer-address (unwrap-wl-display wl-d)))))
+
+(define wl-display-create
+  (let ((create (foreign-library-function wlroots "wl_display_create"
+					  #:return-type '*
+					  #:arg-types '())))
+    (lambda ()
+      "Create a wl-display"
+      (wrap-wl-display (create)))))
+
 		      
 
 ;; -------------
