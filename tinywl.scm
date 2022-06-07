@@ -1,7 +1,8 @@
 (use-modules (system foreign)
 	     (system foreign-library)
 	     (rnrs enums)
-	     (srfi srfi-9))
+	     (srfi srfi-9)
+	     (wayland dylib))
 
 ;; -----
 ;; Utils
@@ -13,11 +14,6 @@
 
 (define (bool->cstdbool bool)
   (if bool 0 1))
-
-;; You'll need to run something like this first:
-;; export GUILE_EXTENSIONS_PATH="/gnu/store/<...>-profile/lib":$GUILE_EXTENSIONS_PATH
-;; to make guile pick up libwlroots.so
-(define wlroots (load-foreign-library "libwlroots"))
 
 ;; ------------------------------------
 ;; Wrappers for 'wayland-server-core.h'
@@ -131,14 +127,78 @@ Returns #f on failure."
 	    (pointer-address (unwrap-wlr-xdg-shell xdg-shell)))))
 
 (define wlr-xdg-shell-create
-  (let ((autocreate
+  (let ((create
 	 (foreign-library-function wlroots "wlr_xdg_shell_create"
 				   #:return-type '*
 				   #:arg-types '(*))))
     (lambda (display)
       "Initializes the xdg-shell"
       (wrap-wlr-xdg-shell
-       (autocreate (unwrap-wl-display display))))))
+       (create (unwrap-wl-display display))))))
+
+;; -----------------------------------------
+;; Wrappers for 'wlr/types/wlr_compositor.h'
+;; WARNING: use of unstable api
+;; -----------------------------------------
+(define-wrapped-pointer-type wlr-compositor
+  wlr-compositor?
+  wrap-wlr-compositor unwrap-wlr-compositor
+  (lambda (compositor prt)
+    (format prt "#<wlr-compositor at ~x>"
+	    (pointer-address (unwrap-wlr-compositor compositor)))))
+
+(define wlr-compositor-create
+  (let ((create
+	 (foreign-library-function wlroots "wlr_compositor_create"
+				   #:return-type '*
+				   #:arg-types '(* *))))
+    (lambda (display renderer)
+      "Create the compositor - necessary for clients to allocate surfaces."
+      (wrap-wlr-compositor
+       (create (unwrap-wl-display display)
+	       (unwrap-wlr-renderer renderer))))))
+
+;; --------------------------------------------------
+;; Wrappers for 'wlr/types/wlr_data_device_manager.h'
+;; WARNING: use of unstable api
+;; --------------------------------------------------
+(define-wrapped-pointer-type wlr-data-device-manager
+  wlr-data-device-manager?
+  wrap-wlr-data-device-manager unwrap-wlr-data-device-manager
+  (lambda (data-device-manager prt)
+    (format prt "#<wlr-data-device-manager at ~x>"
+	    (pointer-address (unwrap-wlr-data-device-manager data-device-manager)))))
+
+(define wlr-data-device-manager-create
+  (let ((create
+	 (foreign-library-function wlroots "wlr_data_device_manager_create"
+				   #:return-type '*
+				   #:arg-types '(*))))
+    (lambda (display)
+      "Create the data-device-manager - handles the clipboard."
+      (wrap-wlr-data-device-manager
+       (create (unwrap-wl-display display))))))
+
+;; --------------------------------------------
+;; Wrappers for 'wlr/types/wlr_output_layout.h'
+;; WARNING: use of unstable api
+;; --------------------------------------------
+(define-wrapped-pointer-type wlr-output-layout
+  wlr-output-layout?
+  wrap-wlr-output-layout unwrap-wlr-output-layout
+  (lambda (output-layout prt)
+    (format prt "#<wlr-output-layout at ~x>"
+	    (pointer-address (unwrap-wlr-output-layout output-layout)))))
+
+(define wlr-output-layout-create
+  (let ((create
+	 (foreign-library-function wlroots "wlr_output_layout_create"
+				   #:return-type '*
+				   #:arg-types '())))
+    (lambda ()
+      "Create an output layout - utility for working with arrangement of
+screens in a physical layout."
+      (wrap-wlr-output-layout (create)))))
 
 ;; -------------
 ;; tinywl.c port
@@ -169,8 +229,11 @@ Returns #f on failure."
        ;; clients.
        (renderer (wlr-renderer-auto-create backend))
        (_ (or (wlr-renderer-init-wl-display renderer display)
-	      (throw "failed to initialise wl-display"))))
-    _))
+	      (throw "failed to initialise wl-display")))
+       (_ (wlr-compositor-create display renderer))
+       (_ (wlr-data-device-manager-create display))
+       (output-layout (wlr-output-layout-create)))
+    output-layout))
 
 (define (check)
   (run 'wlr-error))
