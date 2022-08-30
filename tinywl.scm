@@ -1,8 +1,9 @@
 (use-modules (system foreign)
-	     (system foreign-library)
-	     (rnrs enums)
-	     (srfi srfi-9)
-	     (wayland dylib))
+         (system foreign-library)
+         (rnrs enums)
+         (srfi srfi-9)
+         (ice-9 format)
+         (wayland dylib))
 
 ;; -----
 ;; Utils
@@ -23,12 +24,12 @@
   wrap-wl-display unwrap-wl-display
   (lambda (wl-d prt)
     (format prt "#<wl-display at ~x>"
-	    (pointer-address (unwrap-wl-display wl-d)))))
+        (pointer-address (unwrap-wl-display wl-d)))))
 
 (define wl-display-create
   (let ((create (foreign-library-function wlroots "wl_display_create"
-					  #:return-type '*
-					  #:arg-types '())))
+                      #:return-type '*
+                      #:arg-types '())))
     (lambda ()
       "Create a wl-display"
       (wrap-wl-display (create)))))
@@ -38,21 +39,21 @@
 ;; -----------------------------
 (define wlr-log-importance
   (make-enumeration '(wlr-silent
-		      wlr-error
-		      wlr-info
-		      wlr-debug
-		      wlr-log-importance-last)))
+              wlr-error
+              wlr-info
+              wlr-debug
+              wlr-log-importance-last)))
 
 ;; TODO: Passes NULL callback - should be able to set this
 (define (wlr-log-init verbosity)
   "Will log all messages less than or equal to `verbosity`"
   (let ((init (foreign-library-function wlroots "wlr_log_init"
-					#:return-type void
-					#:arg-types `(,int *)))
-	(wlr-log-level ((enum-set-indexer wlr-log-importance)
-			verbosity)))
+                    #:return-type void
+                    #:arg-types `(,int *)))
+    (wlr-log-level ((enum-set-indexer wlr-log-importance)
+            verbosity)))
     (if wlr-log-level
-	(init wlr-log-level %null-pointer))))
+    (init wlr-log-level %null-pointer))))
 
 ;; ----------------------------
 ;; Wrappers for 'wlr/backend.h'
@@ -63,21 +64,21 @@
   wrap-wlr-backend unwrap-wlr-backend
   (lambda (wlr-b prt)
     (format prt "#<wlr-backend at ~x>"
-	    (pointer-address (unwrap-wlr-backend wlr-b)))))
+        (pointer-address (unwrap-wlr-backend wlr-b)))))
 
 (define wlr-backend-auto-create
   (let ((autocreate
-	 (foreign-library-function wlroots "wlr_backend_autocreate"
-				   #:return-type '*
-				   #:arg-types '(*))))
+     (foreign-library-function wlroots "wlr_backend_autocreate"
+                   #:return-type '*
+                   #:arg-types '(*))))
     (lambda (display)
       "Automatically initializes the most suitable backend given the
 environment. The backend is created but not started. Returns NULL on failure."
       (let ((backend (autocreate
-		      (unwrap-wl-display display))))
-	(if (null-pointer? backend)
-	    (throw "wlr_backend_autocreate returned null")
-	    (wrap-wlr-backend backend))))))
+              (unwrap-wl-display display))))
+    (if (null-pointer? backend)
+        (throw "wlr_backend_autocreate returned null")
+        (wrap-wlr-backend backend))))))
 
 ;; ------------------------------------
 ;; Wrappers for 'wlr/render/renderer.h'
@@ -88,13 +89,13 @@ environment. The backend is created but not started. Returns NULL on failure."
   wrap-wlr-renderer unwrap-wlr-renderer
   (lambda (wlr-r prt)
     (format prt "#<wlr-renderer at ~x>"
-	    (pointer-address (unwrap-wlr-renderer wlr-r)))))
+        (pointer-address (unwrap-wlr-renderer wlr-r)))))
 
 (define wlr-renderer-auto-create
   (let ((autocreate
-	 (foreign-library-function wlroots "wlr_renderer_autocreate"
-				   #:return-type '*
-				   #:arg-types '(*))))
+     (foreign-library-function wlroots "wlr_renderer_autocreate"
+                   #:return-type '*
+                   #:arg-types '(*))))
     (lambda (backend)
       "Automatically initializes the renderer"
       (wrap-wlr-renderer
@@ -102,18 +103,18 @@ environment. The backend is created but not started. Returns NULL on failure."
 
 (define wlr-renderer-init-wl-display
   (let ((init-display
-	 (foreign-library-function wlroots "wlr_renderer_init_wl_display"
-				   #:return-type cstdbool
-				   #:arg-types '(* *))))
+     (foreign-library-function wlroots "wlr_renderer_init_wl_display"
+                   #:return-type cstdbool
+                   #:arg-types '(* *))))
     (lambda (renderer display)
       "Creates necessary shm and invokes the initialization of the
 implementation.
 
 Returns #f on failure."
       (let ((r (unwrap-wlr-renderer renderer))
-	    (d (unwrap-wl-display display)))
-	(cstdbool->bool
-	 (init-display r d))))))
+        (d (unwrap-wl-display display)))
+    (cstdbool->bool
+     (init-display r d))))))
 
 ;; ----------------------------------------
 ;; Wrappers for 'wlr/types/wlr_xdg_shell.h'
@@ -124,13 +125,13 @@ Returns #f on failure."
   wrap-wlr-xdg-shell unwrap-wlr-xdg-shell
   (lambda (xdg-shell prt)
     (format prt "#<wlr-xdg-shell at ~x>"
-	    (pointer-address (unwrap-wlr-xdg-shell xdg-shell)))))
+        (pointer-address (unwrap-wlr-xdg-shell xdg-shell)))))
 
 (define wlr-xdg-shell-create
   (let ((create
-	 (foreign-library-function wlroots "wlr_xdg_shell_create"
-				   #:return-type '*
-				   #:arg-types '(*))))
+     (foreign-library-function wlroots "wlr_xdg_shell_create"
+                   #:return-type '*
+                   #:arg-types '(*))))
     (lambda (display)
       "Initializes the xdg-shell"
       (wrap-wlr-xdg-shell
@@ -145,18 +146,18 @@ Returns #f on failure."
   wrap-wlr-compositor unwrap-wlr-compositor
   (lambda (compositor prt)
     (format prt "#<wlr-compositor at ~x>"
-	    (pointer-address (unwrap-wlr-compositor compositor)))))
+        (pointer-address (unwrap-wlr-compositor compositor)))))
 
 (define wlr-compositor-create
   (let ((create
-	 (foreign-library-function wlroots "wlr_compositor_create"
-				   #:return-type '*
-				   #:arg-types '(* *))))
+     (foreign-library-function wlroots "wlr_compositor_create"
+                   #:return-type '*
+                   #:arg-types '(* *))))
     (lambda (display renderer)
       "Create the compositor - necessary for clients to allocate surfaces."
       (wrap-wlr-compositor
        (create (unwrap-wl-display display)
-	       (unwrap-wlr-renderer renderer))))))
+           (unwrap-wlr-renderer renderer))))))
 
 ;; --------------------------------------------------
 ;; Wrappers for 'wlr/types/wlr_data_device_manager.h'
@@ -167,13 +168,13 @@ Returns #f on failure."
   wrap-wlr-data-device-manager unwrap-wlr-data-device-manager
   (lambda (data-device-manager prt)
     (format prt "#<wlr-data-device-manager at ~x>"
-	    (pointer-address (unwrap-wlr-data-device-manager data-device-manager)))))
+        (pointer-address (unwrap-wlr-data-device-manager data-device-manager)))))
 
 (define wlr-data-device-manager-create
   (let ((create
-	 (foreign-library-function wlroots "wlr_data_device_manager_create"
-				   #:return-type '*
-				   #:arg-types '(*))))
+     (foreign-library-function wlroots "wlr_data_device_manager_create"
+                   #:return-type '*
+                   #:arg-types '(*))))
     (lambda (display)
       "Create the data-device-manager - handles the clipboard."
       (wrap-wlr-data-device-manager
@@ -188,13 +189,13 @@ Returns #f on failure."
   wrap-wlr-output-layout unwrap-wlr-output-layout
   (lambda (output-layout prt)
     (format prt "#<wlr-output-layout at ~x>"
-	    (pointer-address (unwrap-wlr-output-layout output-layout)))))
+        (pointer-address (unwrap-wlr-output-layout output-layout)))))
 
 (define wlr-output-layout-create
   (let ((create
-	 (foreign-library-function wlroots "wlr_output_layout_create"
-				   #:return-type '*
-				   #:arg-types '())))
+     (foreign-library-function wlroots "wlr_output_layout_create"
+                   #:return-type '*
+                   #:arg-types '())))
     (lambda ()
       "Create an output layout - utility for working with arrangement of
 screens in a physical layout."
@@ -205,8 +206,17 @@ screens in a physical layout."
 ;; -------------
 (define tinywl-cursor-mode
   (make-enumeration '(tinywl-cursor-passthrough
-		      tinywl-cursor-move
-		      tinywl-cursor-resize)))
+                      tinywl-cursor-move
+                      tinywl-cursor-resize)))
+
+(define (server-new-output-notify)
+  "This event is raised by the backend when a new output (aka a display
+or a monitor) becomes available."
+  (pointer->procedure void
+                      (lambda (listener data)
+                        (let ((output (wrap-wlr-output data)))
+                          void))
+                      '(* *)))
 
 ;(define-record-type <tinywl-server>
 ;  (make-tinywl-server
@@ -229,7 +239,7 @@ screens in a physical layout."
        ;; clients.
        (renderer (wlr-renderer-auto-create backend))
        (_ (or (wlr-renderer-init-wl-display renderer display)
-	      (throw "failed to initialise wl-display")))
+          (throw "failed to initialise wl-display")))
        (_ (wlr-compositor-create display renderer))
        (_ (wlr-data-device-manager-create display))
        (output-layout (wlr-output-layout-create)))
