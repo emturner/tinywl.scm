@@ -3,7 +3,9 @@
          (rnrs enums)
          (srfi srfi-9)
          (ice-9 format)
-         (wayland dylib))
+         (oop goops)
+         (wayland dylib)
+         (wayland util))
 
 ;; -----
 ;; Utils
@@ -201,6 +203,35 @@ Returns #f on failure."
 screens in a physical layout."
       (wrap-wlr-output-layout (create)))))
 
+;; --------------------------------------------
+;; Wrappers for 'wlr/types/wlr_output.h'
+;; WARNING: use of unstable api
+;; --------------------------------------------
+(define-wrapped-pointer-type wlr-output
+  wlr-output?
+  wrap-wlr-output unwrap-wlr-output
+  (lambda (output prt)
+    (format prt "#<wlr-output at ~x>"
+        (pointer-address (unwrap-wlr-output output)))))
+
+;; (define wlr-output-create
+;;   (let ((create
+;;      (foreign-library-function wlroots "wlr_output_layout_create"
+;;                    #:return-type '*
+;;                    #:arg-types '())))
+;;     (lambda ()
+;;       "A compositor output region. This typically corresponds to a monitor that
+;; displays part of the compositor space.
+
+;; The `frame` event will be emitted when it is a good time for the compositor
+;; to submit a new frame.
+
+;; To render a new frame, compositors should call `wlr_output_attach_render`,
+;; render and call `wlr_output_commit`. No rendering should happen outside a
+;; `frame` event handler or before `wlr_output_attach_render`.
+;; screens in a physical layout."
+;;       (wrap-wlr-output (create)))))
+
 ;; -------------
 ;; tinywl.c port
 ;; -------------
@@ -208,6 +239,86 @@ screens in a physical layout."
   (make-enumeration '(tinywl-cursor-passthrough
                       tinywl-cursor-move
                       tinywl-cursor-resize)))
+
+(define-class <tinywl-server> ()
+  ;; struct wl_display *wl_display;
+  (display #:init-value %null-pointer
+           #:accessor tinywl-server->display)
+  ;; struct wlr_backend *backend;
+  (backend #:init-value %null-pointer
+           #:accessor tinywl-server->backend)
+  ;; struct wlr_renderer *renderer;
+  (renderer #:init-value %null-pointer
+            #:accessor tinywl-server->renderer)
+  ;; struct wlr_xdg_shell *xdg_shell;
+  (xdg-shell #:init-value %null-pointer
+             #:accessor tinywl-server->xdg-shell)
+  ;; struct wl_listener new_xdg_surface; FIXME pointer
+  (new-xdg-surface #:init-value %null-pointer
+                   #:accessor tinywl-server->new-xdg-surface)
+  ;; struct wl_list views; FIXME views subclass
+  (views #:init-value (make <wl-list>)
+         #:accessor tinywl-server->views)
+  ;; struct wlr_cursor *cursor;
+  (cursor #:init-value %null-pointer
+          #:accessor tinywl-server->cursor)
+  ;; struct wlr_xcursor_manager *cursor_mgr;
+  (xcursor-mgr #:init-value %null-pointer
+               #:accessor tinywl-server->xcursor-mgr)
+  ;; struct wl_listener cursor_motion; FIXME pointer
+  (cursor-motion #:init-value %null-pointer
+                 #:accessor tinywl-server->cursor-motion)
+  ;; struct wl_listener cursor_motion_absolute; FIXME pointer
+  (cursor-motion-absolute #:init-value %null-pointer
+                          #:accessor tinywl-server->cursor-motion-absolute)
+  ;; struct wl_listener cursor_button; FIXME pointer
+  (cursor-button #:init-value %null-pointer
+                 #:accessor tinywl-server->cursor-button)
+  ;; struct wl_listener cursor_axis; FIXME pointer
+  (cursor-axis #:init-value %null-pointer
+               #:accessor tinywl-server->cursor-axis)
+  ;; struct wl_listener cursor_frame; FIXME pointer
+  (cursor-frame #:init-value %null-pointer
+                #:accessor tinywl-server->cursor-frame)
+  ;; struct wlr_seat *seat;
+  (seat #:init-value %null-pointer
+        #:accessor tinywl-server->seat)
+  ;; struct wl_listener new_input; FIXME pointer
+  (new-input #:init-value %null-pointer
+             #:accessor tinywl-server->new-input)
+  ;; struct wl_listener request_cursor; FIXME pointer
+  (request-cursor #:init-value %null-pointer
+                  #:accessor tinywl-server->request-cursor)
+  ;; struct wl_listener request_set_selection; FIXME pointer
+  (request-set-selection #:init-value %null-pointer
+                         #:accessor tinywl-server->request_set-selection)
+  ;; struct wl_list keyboards; FIXME keyboard subclass
+  (keyboards #:init-value (make <wl-list>)
+             #:accessor tinywl-server->keyboards)
+  ;; enum tinywl_cursor_mode cursor_mode;
+  (cursor-mode #:init-value 'tinywl-cursor-passthrough
+               #:accessor tinywl-server->cursor-mode)
+  ;; struct tinywl_view *grabbed_view;
+  (grabbed-view #:init-value %null-pointer
+                #:accessor tinywl-server->grabbed-view)
+  ;; double grab_x, grab_y;
+  (grab-coords #:init-value '(0.0 . 0.0)
+               #:accessor tinywl-server->grab-coords)
+  ;; struct wlr_box grab_geobox; FIXME pointer
+  (grab-geobox #:init-value %null-pointer
+               #:accessor tinywl-server->grab-geobox)
+  ;; uint32_t resize_edges;
+  (resize-edges #:init-value 0
+                #:accessor tinywl-server->resize-edges)
+  ;; struct wlr_output_layout *output_layout;
+  (output-layout #:init-value %null-pointer
+                 #:accessor tinywl-server->output-layout)
+  ;; struct wl_list outputs; FIXME output subclass
+  (outputs #:init-value (make <wl-list>)
+           #:accessor tinywl-server->outputs)
+  ;; struct wl_listener new_output; FIXME pointer
+  (new-output #:init-value %null-pointer
+              #:accessor tinywl-server->new-output))
 
 (define (server-new-output-notify)
   "This event is raised by the backend when a new output (aka a display
@@ -243,6 +354,9 @@ or a monitor) becomes available."
        (_ (wlr-compositor-create display renderer))
        (_ (wlr-data-device-manager-create display))
        (output-layout (wlr-output-layout-create)))
+       ;; Configure a listener to be notified when new outputs are available
+       ;; on the backend.
+       ;; (server_new_output_notify ('(todo func)))
     output-layout))
 
 (define (check)
