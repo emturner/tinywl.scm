@@ -335,29 +335,36 @@ or a monitor) becomes available."
 (define (run verbosity)
   (wlr-log-init verbosity)
   ;; TODO: startup command
-  (let*
-      ;; The wayland display is managed by libwayland. It handles accepting
-      ;; clients from the Unix socket, managing Wayland globals, and so on.
-      ((display (wl-display-create))
-       ;; The backend is a wlroots feature which abstracts the underlying input
-       ;; and output hardware. The autocreate option will choose the most
-       ;; suitable backend based on the current environment, such as opening
-       ;; an X11 window if an X11 server is running.
-       (backend (wlr-backend-auto-create display))
-       ;; If we don't provide a renderer, autocreate makes a GLES2 renderr for
-       ;; us.  The renderer is responsible for defining the various pixel
-       ;; formats it supports for shared memory, this configures that for
-       ;; clients.
-       (renderer (wlr-renderer-auto-create backend))
-       (_ (or (wlr-renderer-init-wl-display renderer display)
-          (throw "failed to initialise wl-display")))
-       (_ (wlr-compositor-create display renderer))
-       (_ (wlr-data-device-manager-create display))
-       (output-layout (wlr-output-layout-create)))
-       ;; Configure a listener to be notified when new outputs are available
-       ;; on the backend.
-       ;; (server_new_output_notify ('(todo func)))
-    output-layout))
+  (define server (make <tinywl-server>))
+  ;; The wayland display is managed by libwayland. It handles accepting
+  ;; clients from the Unix socket, managing Wayland globals, and so on.
+  (set! (tinywl-server->display server) (wl-display-create))
+  ;; The backend is a wlroots feature which abstracts the underlying input
+  ;; and output hardware. The autocreate option will choose the most
+  ;; suitable backend based on the current environment, such as opening
+  ;; an X11 window if an X11 server is running.
+  (set! (tinywl-server->backend server)
+        (wlr-backend-auto-create (tinywl-server->display server)))
+  ;; If we don't provide a renderer, autocreate makes a GLES2 renderr for
+  ;; us.  The renderer is responsible for defining the various pixel
+  ;; formats it supports for shared memory, this configures that for
+  ;; clients.
+  (set! (tinywl-server->renderer server)
+        (wlr-renderer-auto-create (tinywl-server->backend server)))
+  (or (wlr-renderer-init-wl-display
+       (tinywl-server->renderer server)
+       (tinywl-server->display server))
+      (throw "failed to initialise wl-display"))
+  (wlr-compositor-create (tinywl-server->display server)
+                         (tinywl-server->renderer server))
+  (wlr-data-device-manager-create (tinywl-server->display server))
+  (set! (tinywl-server->output-layout server)
+        (wlr-output-layout-create))
+
+  ;; TODO Configure a listener to be notified when new outputs are available
+  ;; on the backend.
+  ;; (server_new_output_notify ('(todo func)))
+  server)
 
 (define (check)
   (run 'wlr-error))
