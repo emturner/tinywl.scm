@@ -7,10 +7,18 @@
   #:use-module (system foreign-library)
   #:use-module (wayland dylib)
   #:export (<wl-list>
-        wl-list-inner
-        wl-list-length
-        wl-list-empty?
-        wl-list-remove))
+            wl-list-init
+            wl-list-inner
+            wl-list-length
+            wl-list-empty?
+            wl-list-remove
+            wl-list-c-type
+            wl-list
+            wl-list?
+            wrap-wl-list
+            unwrap-wl-list))
+
+(define wl-list-c-type '(* *))
 
 (define-wrapped-pointer-type wl-list
   wl-list?
@@ -37,15 +45,15 @@
 (define (make-wl-list)
   "Creates a new, initialised wl-list instance"
   (let ((lst (wrap-wl-list
-          (make-c-struct '(* *)
-                 `(,%null-pointer ,%null-pointer)))))
+          (make-c-struct wl-list-c-type
+                         `(,%null-pointer ,%null-pointer)))))
     (inner-init lst)
     lst))
 
 (define-class <wl-list> ()
   (lst #:init-value (make-wl-list)
        #:accessor wl-list-inner
-       #:init-value #:wl-list-inner))
+       #:init-keyword #:wl-list-inner))
 
 (define inner-length
   (let ((len (foreign-library-function wlroots "wl_list_length"
@@ -53,6 +61,10 @@
                        #:arg-types '(*))))
     (lambda (lst)
       (len (unwrap-wl-list lst)))))
+
+(define-method (wl-list-init (l <wl-list>))
+  "Initialises the inner list."
+  (inner-init (wl-list-inner l)))
 
 (define-method (wl-list-length (l <wl-list>))
   "Returns the length of the wl-list `lst`"

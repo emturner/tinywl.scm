@@ -232,6 +232,53 @@ screens in a physical layout."
 ;; screens in a physical layout."
 ;;       (wrap-wlr-output (create)))))
 
+;; --------------------------------------------
+;; Wrappers for 'wayland-server-core.h'
+;; WARNING: use of unstable api
+;; --------------------------------------------
+;;  "A wl-notify-func-t expects a *wl_listener, and a void* data."
+(define-wrapped-pointer-type wl-notify-func-t
+  wl-notify-func-t?
+  wrap-wl-notify-func-t unwrap-wl-notify-func-t
+  (lambda (output prt)
+    (format prt "#<wl-notify-func-t at ~x>"
+        (pointer-address (unwrap-wl-notify-func-t output)))))
+
+(define (proc->wl-notify-func-t proc)
+  (let ((ptr (procedure->pointer void proc '(* *))))
+    (wrap-wl-notify-func-t ptr)))
+
+;; "A wl-listener contains a wl-list link, and a wl-notify-func-t"
+(define-wrapped-pointer-type wl-listener
+  wl-listener?
+  wrap-wl-listener unwrap-wl-listener
+  (lambda (output prt)
+    (format prt "#<wl-listener at ~x>"
+        (pointer-address (unwrap-wl-notify-func-t output)))))
+
+(define-class <wl-listener> (<wl-list>)
+  (self        #:init-value %null-pointer
+               #:getter wl-listener->self
+               #:init-keyword #:self)
+  (notify-func #:init-value %null-pointer
+               #:accessor wl-listener->notify-func
+               #:init-keyword #:notify-func))
+
+(define-method (initialize (self <wl-listener>) initargs)
+  (let* ((listener-raw (make-c-struct `(,wl-list-c-type *)
+                                      `((,%null-pointer ,%null-pointer)
+                                        ,%null-pointer)))
+         (lst-raw listener-raw)
+         (notify-raw (cadr (parse-c-struct listener-raw
+                                           `(,wl-list-c-type *))))
+         (listener
+          (next-method self
+                       (list #:self (wrap-wl-listener listener-raw)
+                             #:inner-list (wrap-wl-list lst-raw)
+                             #:notify-fun (wrap-wl-notify-func-t notify-raw)))))
+    (wl-list-init listener)
+    listener))
+
 ;; -------------
 ;; tinywl.c port
 ;; -------------
@@ -253,8 +300,8 @@ screens in a physical layout."
   ;; struct wlr_xdg_shell *xdg_shell;
   (xdg-shell #:init-value %null-pointer
              #:accessor tinywl-server->xdg-shell)
-  ;; struct wl_listener new_xdg_surface; FIXME pointer
-  (new-xdg-surface #:init-value %null-pointer
+  ;; struct wl_listener new_xdg_surface;
+  (new-xdg-surface #:init-value (make <wl-listener>)
                    #:accessor tinywl-server->new-xdg-surface)
   ;; struct wl_list views; FIXME views subclass
   (views #:init-value (make <wl-list>)
@@ -265,32 +312,32 @@ screens in a physical layout."
   ;; struct wlr_xcursor_manager *cursor_mgr;
   (xcursor-mgr #:init-value %null-pointer
                #:accessor tinywl-server->xcursor-mgr)
-  ;; struct wl_listener cursor_motion; FIXME pointer
-  (cursor-motion #:init-value %null-pointer
+  ;; struct wl_listener cursor_motion;
+  (cursor-motion #:init-value (make <wl-listener>)
                  #:accessor tinywl-server->cursor-motion)
-  ;; struct wl_listener cursor_motion_absolute; FIXME pointer
-  (cursor-motion-absolute #:init-value %null-pointer
+  ;; struct wl_listener cursor_motion_absolute;
+  (cursor-motion-absolute #:init-value (make <wl-listener>)
                           #:accessor tinywl-server->cursor-motion-absolute)
-  ;; struct wl_listener cursor_button; FIXME pointer
-  (cursor-button #:init-value %null-pointer
+  ;; struct wl_listener cursor_button;
+  (cursor-button #:init-value (make <wl-listener>)
                  #:accessor tinywl-server->cursor-button)
-  ;; struct wl_listener cursor_axis; FIXME pointer
-  (cursor-axis #:init-value %null-pointer
+  ;; struct wl_listener cursor_axis;
+  (cursor-axis #:init-value (make <wl-listener>)
                #:accessor tinywl-server->cursor-axis)
-  ;; struct wl_listener cursor_frame; FIXME pointer
-  (cursor-frame #:init-value %null-pointer
+  ;; struct wl_listener cursor_frame;
+  (cursor-frame #:init-value (make <wl-listener>)
                 #:accessor tinywl-server->cursor-frame)
   ;; struct wlr_seat *seat;
   (seat #:init-value %null-pointer
         #:accessor tinywl-server->seat)
-  ;; struct wl_listener new_input; FIXME pointer
-  (new-input #:init-value %null-pointer
+  ;; struct wl_listener new_input;
+  (new-input #:init-value (make <wl-listener>)
              #:accessor tinywl-server->new-input)
-  ;; struct wl_listener request_cursor; FIXME pointer
-  (request-cursor #:init-value %null-pointer
+  ;; struct wl_listener request_cursor; 
+  (request-cursor #:init-value (make <wl-listener>)
                   #:accessor tinywl-server->request-cursor)
-  ;; struct wl_listener request_set_selection; FIXME pointer
-  (request-set-selection #:init-value %null-pointer
+  ;; struct wl_listener request_set_selection;
+  (request-set-selection #:init-value (make <wl-listener>)
                          #:accessor tinywl-server->request_set-selection)
   ;; struct wl_list keyboards; FIXME keyboard subclass
   (keyboards #:init-value (make <wl-list>)
@@ -316,21 +363,24 @@ screens in a physical layout."
   ;; struct wl_list outputs; FIXME output subclass
   (outputs #:init-value (make <wl-list>)
            #:accessor tinywl-server->outputs)
-  ;; struct wl_listener new_output; FIXME pointer
-  (new-output #:init-value %null-pointer
+  ;; struct wl_listener new_output;
+  (new-output #:init-value (make <wl-listener>)
               #:accessor tinywl-server->new-output))
 
-(define (server-new-output-notify)
+(define (server-new-output-notify server)
   "This event is raised by the backend when a new output (aka a display
 or a monitor) becomes available."
-  (pointer->procedure void
-                      (lambda (listener data)
-                        (let ((output (wrap-wlr-output data)))
-                          void))
-                      '(* *)))
-
-;(define-record-type <tinywl-server>
-;  (make-tinywl-server
+  (proc->wl-notify-func-t
+   (lambda (listener-raw-ptr data-raw-ptr)
+    (let* ((output-ptr (wrap-wlr-output data-raw-ptr))
+           ;; Some backends don't have modes. DRM+KMS does,
+           ;; and we need to set a mode before we can use the output.
+           ;; The mode is a tuple of (width, height, refresh rate), and
+           ;; each monitor supports only a specific set of modes. We just
+           ;; pick the monitor's preferred mode, a more sophisticated
+           ;; compositor would let the user configure it.
+           )
+      '()))))
 
 (define (run verbosity)
   (wlr-log-init verbosity)
