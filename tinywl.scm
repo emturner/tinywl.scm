@@ -1,40 +1,16 @@
-(use-modules (system foreign)
-         (system foreign-library)
-         (rnrs enums)
-         (srfi srfi-9)
-         (ice-9 format)
-         (oop goops)
-         (wayland dylib)
-         (wayland util))
-
-;; -----
-;; Utils
-;; -----
-(define cstdbool int)
-
-(define (cstdbool->bool cbool)
-  (not (eq? 0 cbool)))
-
-(define (bool->cstdbool bool)
-  (if bool 0 1))
-
-;; ------------------------------------
-;; Wrappers for 'wayland-server-core.h'
-;; ------------------------------------
-(define-wrapped-pointer-type wl-display
-  wl-display?
-  wrap-wl-display unwrap-wl-display
-  (lambda (wl-d prt)
-    (format prt "#<wl-display at ~x>"
-        (pointer-address (unwrap-wl-display wl-d)))))
-
-(define wl-display-create
-  (let ((create (foreign-library-function wlroots "wl_display_create"
-                      #:return-type '*
-                      #:arg-types '())))
-    (lambda ()
-      "Create a wl-display"
-      (wrap-wl-display (create)))))
+(define-module (tinywl)
+  #:use-module (system foreign)
+  #:use-module (system foreign-library)
+  #:use-module (rnrs enums)
+  #:use-module (srfi srfi-9)
+  #:use-module (ice-9 format)
+  #:use-module (oop goops)
+  #:use-module (wayland-server-core)
+  #:use-module (wayland dylib)
+  #:use-module (wayland util)
+  #:use-module (wlr types wlr-output)
+  #:use-module (emturner util)
+  #:export (run check))
 
 ;; -----------------------------
 ;; Wrappers for 'wlr/util/log.h'
@@ -203,82 +179,6 @@ Returns #f on failure."
 screens in a physical layout."
       (wrap-wlr-output-layout (create)))))
 
-;; --------------------------------------------
-;; Wrappers for 'wlr/types/wlr_output.h'
-;; WARNING: use of unstable api
-;; --------------------------------------------
-(define-wrapped-pointer-type wlr-output
-  wlr-output?
-  wrap-wlr-output unwrap-wlr-output
-  (lambda (output prt)
-    (format prt "#<wlr-output at ~x>"
-        (pointer-address (unwrap-wlr-output output)))))
-
-;; (define wlr-output-create
-;;   (let ((create
-;;      (foreign-library-function wlroots "wlr_output_layout_create"
-;;                    #:return-type '*
-;;                    #:arg-types '())))
-;;     (lambda ()
-;;       "A compositor output region. This typically corresponds to a monitor that
-;; displays part of the compositor space.
-
-;; The `frame` event will be emitted when it is a good time for the compositor
-;; to submit a new frame.
-
-;; To render a new frame, compositors should call `wlr_output_attach_render`,
-;; render and call `wlr_output_commit`. No rendering should happen outside a
-;; `frame` event handler or before `wlr_output_attach_render`.
-;; screens in a physical layout."
-;;       (wrap-wlr-output (create)))))
-
-;; --------------------------------------------
-;; Wrappers for 'wayland-server-core.h'
-;; WARNING: use of unstable api
-;; --------------------------------------------
-;;  "A wl-notify-func-t expects a *wl_listener, and a void* data."
-(define-wrapped-pointer-type wl-notify-func-t
-  wl-notify-func-t?
-  wrap-wl-notify-func-t unwrap-wl-notify-func-t
-  (lambda (output prt)
-    (format prt "#<wl-notify-func-t at ~x>"
-        (pointer-address (unwrap-wl-notify-func-t output)))))
-
-(define (proc->wl-notify-func-t proc)
-  (let ((ptr (procedure->pointer void proc '(* *))))
-    (wrap-wl-notify-func-t ptr)))
-
-;; "A wl-listener contains a wl-list link, and a wl-notify-func-t"
-(define-wrapped-pointer-type wl-listener
-  wl-listener?
-  wrap-wl-listener unwrap-wl-listener
-  (lambda (output prt)
-    (format prt "#<wl-listener at ~x>"
-        (pointer-address (unwrap-wl-notify-func-t output)))))
-
-(define-class <wl-listener> (<wl-list>)
-  (self        #:init-value %null-pointer
-               #:getter wl-listener->self
-               #:init-keyword #:self)
-  (notify-func #:init-value %null-pointer
-               #:accessor wl-listener->notify-func
-               #:init-keyword #:notify-func))
-
-(define-method (initialize (self <wl-listener>) initargs)
-  (let* ((listener-raw (make-c-struct `(,wl-list-c-type *)
-                                      `((,%null-pointer ,%null-pointer)
-                                        ,%null-pointer)))
-         (lst-raw listener-raw)
-         (notify-raw (cadr (parse-c-struct listener-raw
-                                           `(,wl-list-c-type *))))
-         (listener
-          (next-method self
-                       (list #:self (wrap-wl-listener listener-raw)
-                             #:inner-list (wrap-wl-list lst-raw)
-                             #:notify-fun (wrap-wl-notify-func-t notify-raw)))))
-    (wl-list-init listener)
-    listener))
-
 ;; -------------
 ;; tinywl.c port
 ;; -------------
@@ -372,7 +272,7 @@ screens in a physical layout."
 or a monitor) becomes available."
   (proc->wl-notify-func-t
    (lambda (listener-raw-ptr data-raw-ptr)
-    (let* ((output-ptr (wrap-wlr-output data-raw-ptr))
+    (let* ((output-ptr (wrap-wlr-output-ptr data-raw-ptr))
            ;; Some backends don't have modes. DRM+KMS does,
            ;; and we need to set a mode before we can use the output.
            ;; The mode is a tuple of (width, height, refresh rate), and
