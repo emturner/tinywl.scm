@@ -33,5 +33,5 @@ check: tinywl.scm wayland-server-core.scm wayland-server-protocol.scm \
 clean:
 	rm -f tinywl xdg-shell-protocol.h xdg-shell-protocol.c
 
-.DEFAULT_GOAL=check.scm
+.DEFAULT_GOAL=check
 .PHONY: clean

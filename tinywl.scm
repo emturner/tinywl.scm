@@ -272,15 +272,16 @@ screens in a physical layout."
 or a monitor) becomes available."
   (proc->wl-notify-func-t
    (lambda (listener-raw-ptr data-raw-ptr)
-    (let* ((output-ptr (wrap-wlr-output-ptr data-raw-ptr))
-           ;; Some backends don't have modes. DRM+KMS does,
-           ;; and we need to set a mode before we can use the output.
-           ;; The mode is a tuple of (width, height, refresh rate), and
-           ;; each monitor supports only a specific set of modes. We just
-           ;; pick the monitor's preferred mode, a more sophisticated
-           ;; compositor would let the user configure it.
-           )
-      '()))))
+    (let ((wlr-output (make <wlr-output>
+                        #:ptr (wrap-wlr-output-ptr data-raw-ptr))))
+      ;; Some backends don't have modes. DRM+KMS does,
+      ;; and we need to set a mode before we can use the output.
+      ;; The mode is a tuple of (width, height, refresh rate), and
+      ;; each monitor supports only a specific set of modes. We just
+      ;; pick the monitor's preferred mode, a more sophisticated
+      ;; compositor would let the user configure it.
+      (and (set-preferred-mode wlr-output)
+          '())))))
 
 (define (run verbosity)
   (wlr-log-init verbosity)
