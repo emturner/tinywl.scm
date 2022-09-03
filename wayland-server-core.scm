@@ -17,7 +17,6 @@
             wl-display-create)
   #:export-syntax (unwrap-wl-display))
 
-
 (define-wrapped-pointer-type wl-display
   wl-display?
   wrap-wl-display unwrap-wl-display

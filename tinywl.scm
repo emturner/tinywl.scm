@@ -29,9 +29,9 @@
                     #:return-type void
                     #:arg-types `(,int *)))
     (wlr-log-level ((enum-set-indexer wlr-log-importance)
-            verbosity)))
+                    verbosity)))
     (if wlr-log-level
-    (init wlr-log-level %null-pointer))))
+        (init wlr-log-level %null-pointer))))
 
 ;; ----------------------------
 ;; Wrappers for 'wlr/backend.h'

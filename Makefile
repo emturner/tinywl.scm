@@ -23,7 +23,7 @@ tinywl: tinywl.c xdg-shell-protocol.h xdg-shell-protocol.c
 		-o $@ $< \
 		$(LIBS)
 
-check: tinywl.scm wayland-server-core.scm \
+check: tinywl.scm wayland-server-core.scm wayland-server-protocol.scm \
 		emturner/util.scm \
 		wayland/dylib.scm wayland/util.scm \
 		wlr/types/wlr-output.scm

@@ -17,6 +17,30 @@
 ;; Wrapper for <wlr/types/wlr_output.h>
 ;; WARNING: use of unstable api
 
+;; Holds the double-buffered output state.
+(define wlr-output-state-c-type
+  `(,uint32 ;; uint32_t committed; // enum wlr_output_state_field
+    ,int32;; pixman_region32_t damage; // output-buffer-local coordinates FIXME: unsure of actual size?
+    ,cstdbool ;; bool enabled;
+    ,float ;; float scale;
+    ,int ;; enum wl_output_transform transform;
+    ,cstdbool ;; bool adaptive_sync_enabled;
+
+    ;; only valid if WLR_OUTPUT_STATE_BUFFER
+    ,int ;; enum wlr_output_state_buffer_type buffer_type;
+    * ;; struct wlr_buffer *buffer; // if WLR_OUTPUT_STATE_BUFFER_SCANOUT
+
+    ;; only valid if WLR_OUTPUT_STATE_MODE
+    ,int ;; enum wlr_output_state_mode_type mode_type;
+    * ;; struct wlr_output_mode *mode;
+    (,int32 ,int32 ;; int32_t width, height;
+     ,int32 ;; int32_t refresh; // mHz, may be zero
+     ) ;; custom_mode;
+
+    ;; only valid if WLR_OUTPUT_STATE_GAMMA_LUT
+    ,uint16 ;; uint16_t *gamma_lut;
+    ,size_t));; size_t gamma_lut_size;
+
 (define-wrapped-pointer-type wlr-output-ptr
   wlr-output-ptr?
   wrap-wlr-output-ptr unwrap-wlr-output-ptr
@@ -50,18 +74,18 @@
     ;;  Note: some backends may have zero modes
     ,wl-list-c-type ;;  struct wl_list modes; // wlr_output_mode::link
     * ;;  struct wlr_output_mode *current_mode;
-    ,int32 ;;  int32_t width, height;
+    ,int32 ,int32 ;;  int32_t width, height;
     ,int32 ;;  int32_t refresh; // mHz, may be zero
     ,cstdbool ;;  bool enabled;
     ,float ;;  float scale;
-    ;; FIXME  enum wl_output_subpixel subpixel;
-    ;; FIXME  enum wl_output_transform transform;
-    ;; FIXME  enum wlr_output_adaptive_sync_status adaptive_sync_status;
+    ,int ;; enum wl_output_subpixel subpixel;
+    ,int ;; enum wl_output_transform transform;
+    ,int ;; enum wlr_output_adaptive_sync_status adaptive_sync_status;
     ,cstdbool ;;  bool needs_frame;
     ;; damage for cursors and fullscreen surface, in output-local coordinates
     ,cstdbool ;;  bool frame_pending;
     ,float ;;  float transform_matrix[9];
-    ;; FIXME struct wlr_output_state pending;
+    ,wlr-output-state-c-type ;; FIXME struct wlr_output_state pending;
     ;; Commit sequence number. Incremented on each commit, may overflow.
     ,uint32 ;; uint32_t commit_seq;
     (;;     struct events
