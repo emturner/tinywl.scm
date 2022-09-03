@@ -14,7 +14,8 @@
             <wl-listener>
             wl-listener-c-type
             wl-display
-            wl-display-create)
+            wl-display-create
+            wl-signal-c-type)
   #:export-syntax (unwrap-wl-display))
 
 (define-wrapped-pointer-type wl-display
@@ -76,3 +77,22 @@
                              #:notify-fun (wrap-wl-notify-func-t notify-raw)))))
     (wl-list-init listener)
     listener))
+
+;; A wl-signal contains a wl-list link"
+(define-wrapped-pointer-type wl-signal-ptr
+  wl-signal-ptr?
+  wrap-wl-signal-ptr unwrap-wl-signal-ptr
+  (lambda (signal prt)
+    (format prt "#<wl-signal-ptr at ~x>"
+            (pointer-address (unwrap-wl-signal-ptr signal)))))
+
+(define wl-signal-c-type `(,wl-list-c-type))
+
+;; A source of a type of observable event
+;;
+;; Signals are recognized points where significant events can be observed.
+;; Compositors as well as the server can provide signals. Observers are
+;; <wl-listener>'s that are added through wl-signal-add.  Signals are emitted
+;; using wl-signal-emit, which will invoke all listeners until that
+;; listener is removed by wl-list-remove (or whenever the signal is destroyed)
+(define-class <wl-signal> (<wl-list>))

@@ -85,30 +85,30 @@
     ;; damage for cursors and fullscreen surface, in output-local coordinates
     ,cstdbool ;;  bool frame_pending;
     ,float ;;  float transform_matrix[9];
-    ,wlr-output-state-c-type ;; FIXME struct wlr_output_state pending;
+    ,wlr-output-state-c-type ;; struct wlr_output_state pending;
     ;; Commit sequence number. Incremented on each commit, may overflow.
     ,uint32 ;; uint32_t commit_seq;
     (;;     struct events
      ;; Request to render a frame
-     ;; FIXME struct wl_signal frame;
+     ,wl-signal-c-type;; struct wl_signal frame;
      ;; Emitted when software cursors or backend-specific logic damage the
      ;; output
-     ;; FIXME struct wl_signal damage; // wlr_output_event_damage
+     ,wl-signal-c-type;; struct wl_signal damage; // wlr_output_event_damage
      ;; Emitted when a new frame needs to be committed (because of
      ;; backend-specific logic)
-     ;; FIXME struct wl_signal needs_frame;
+     ,wl-signal-c-type;; struct wl_signal needs_frame;
      ;; Emitted right before commit
-     ;; FIXME struct wl_signal precommit; // wlr_output_event_precommit
+     ,wl-signal-c-type;; struct wl_signal precommit; // wlr_output_event_precommit
      ;; Emitted right after commit
-     ;; FIXME struct wl_signal commit; // wlr_output_event_commit
+     ,wl-signal-c-type;; struct wl_signal commit; // wlr_output_event_commit
      ;; Emitted right after the buffer has been presented to the user
-     ;; FIXME struct wl_signal present; // wlr_output_event_present
+     ,wl-signal-c-type;; struct wl_signal present; // wlr_output_event_present
      ;; Emitted after a client bound the wl_output global
-     ;; FIXME struct wl_signal bind; // wlr_output_event_bind
-     ;; FIXME struct wl_signal enable;
-     ;; FIXME struct wl_signal mode;
-     ;; FIXME struct wl_signal description;
-     ;; FIXME struct wl_signal destroy;
+     ,wl-signal-c-type;; struct wl_signal bind; // wlr_output_event_bind
+     ,wl-signal-c-type;; struct wl_signal enable;
+     ,wl-signal-c-type;; struct wl_signal mode;
+     ,wl-signal-c-type;; struct wl_signal description;
+     ,wl-signal-c-type;; struct wl_signal destroy;
      )
      * ;; struct wl_event_source *idle_frame;
      * ;; struct wl_event_source *idle_done;
