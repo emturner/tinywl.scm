@@ -23,8 +23,15 @@ tinywl: tinywl.c xdg-shell-protocol.h xdg-shell-protocol.c
 		-o $@ $< \
 		$(LIBS)
 
+check: tinywl.scm wayland-server-core.scm \
+		emturner/util.scm \
+		wayland/dylib.scm wayland/util.scm \
+		wlr/types/wlr-output.scm
+	GUILE_EXTENSIONS_PATH=$(GUIX_ENVIRONMENT)/lib:$(GUILE_EXTENSIONS_PATH) \
+		guile -L . -c '(use-modules (tinywl)) (check)'
+
 clean:
 	rm -f tinywl xdg-shell-protocol.h xdg-shell-protocol.c
 
-.DEFAULT_GOAL=tinywl
+.DEFAULT_GOAL=check.scm
 .PHONY: clean
