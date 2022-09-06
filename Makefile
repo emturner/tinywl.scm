@@ -23,11 +23,20 @@ tinywl: tinywl.c xdg-shell-protocol.h xdg-shell-protocol.c
 		-o $@ $< \
 		$(LIBS)
 
+clock-time: emturner/clock.c
+	$(CC) $(CFLAGS) \
+        -shared \
+		-g -Werror -I/gnu/store/1jgcbdzx2ss6xv59w55g3kr3x4935dfb-guile-3.0.8/include/guile/3.0 \
+		-DWLR_USE_UNSTABLE \
+		-o $@.so -fPIC $< \
+		$(LIBS)
+
 check: tinywl.scm wayland-server-core.scm wayland-server-protocol.scm \
 		emturner/util.scm \
 		wayland/dylib.scm wayland/util.scm \
-		wlr/types/wlr-output.scm
-	GUILE_EXTENSIONS_PATH=$(GUIX_ENVIRONMENT)/lib:$(GUILE_EXTENSIONS_PATH) \
+		wlr/types/wlr-output.scm \
+        clock-time emturner/clock.scm
+	GUILE_EXTENSIONS_PATH=$(GUIX_ENVIRONMENT)/lib:$(PWD):$(GUILE_EXTENSIONS_PATH) \
 		guile -L . -c '(use-modules (tinywl)) (check)'
 
 clean:
