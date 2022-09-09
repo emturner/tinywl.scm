@@ -23,6 +23,8 @@
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include <libguile.h>
+
 /* For brevity's sake, struct members are annotated where they are used. */
 enum tinywl_cursor_mode {
 	TINYWL_CURSOR_PASSTHROUGH,
@@ -816,25 +818,11 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	wl_list_insert(&server->views, &view->link);
 }
 
-int main(int argc, char *argv[]) {
+SCM
+run(SCM startup_command)
+{
 	wlr_log_init(WLR_DEBUG, NULL);
-	char *startup_cmd = NULL;
-
-	int c;
-	while ((c = getopt(argc, argv, "s:h")) != -1) {
-		switch (c) {
-		case 's':
-			startup_cmd = optarg;
-			break;
-		default:
-			printf("Usage: %s [-s startup command]\n", argv[0]);
-			return 0;
-		}
-	}
-	if (optind < argc) {
-		printf("Usage: %s [-s startup command]\n", argv[0]);
-		return 0;
-	}
+	char *startup_cmd = scm_to_utf8_stringn (startup_command, NULL); // make it null terminated
 
 	struct tinywl_server server;
 	/* The Wayland display is managed by libwayland. It handles accepting
@@ -943,7 +931,7 @@ int main(int argc, char *argv[]) {
 	const char *socket = wl_display_add_socket_auto(server.wl_display);
 	if (!socket) {
 		wlr_backend_destroy(server.backend);
-		return 1;
+		return scm_from_int(1);
 	}
 
 	/* Start the backend. This will enumerate outputs and inputs, become the DRM
@@ -951,7 +939,7 @@ int main(int argc, char *argv[]) {
 	if (!wlr_backend_start(server.backend)) {
 		wlr_backend_destroy(server.backend);
 		wl_display_destroy(server.wl_display);
-		return 1;
+		return scm_from_int(1);
 	}
 
 	/* Set the WAYLAND_DISPLAY environment variable to our socket and run the
@@ -973,5 +961,11 @@ int main(int argc, char *argv[]) {
 	/* Once wl_display_run returns, we shut down the server. */
 	wl_display_destroy_clients(server.wl_display);
 	wl_display_destroy(server.wl_display);
-	return 0;
+	return scm_from_int(0);
+}
+
+void
+init_tinywl_wrapper (void)
+{
+    scm_c_define_gsubr("run", 1, 0, 0, run);
 }

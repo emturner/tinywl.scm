@@ -16,11 +16,13 @@ xdg-shell-protocol.c: xdg-shell-protocol.h
 	$(WAYLAND_SCANNER) private-code \
 		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
 
-tinywl: tinywl.c xdg-shell-protocol.h xdg-shell-protocol.c
+tinywl: tinywl-core/tinywl.c xdg-shell-protocol.h xdg-shell-protocol.c
 	$(CC) $(CFLAGS) \
+        -shared \
 		-g -Werror -I. \
+		-I/gnu/store/1jgcbdzx2ss6xv59w55g3kr3x4935dfb-guile-3.0.8/include/guile/3.0 \
 		-DWLR_USE_UNSTABLE \
-		-o $@ $< \
+		-o $@.so -fPIC $< \
 		$(LIBS)
 
 clock-time: emturner/clock.c
@@ -35,12 +37,13 @@ check: tinywl.scm wayland-server-core.scm wayland-server-protocol.scm \
 		emturner/util.scm \
 		wayland/dylib.scm wayland/util.scm \
 		wlr/types/wlr-output.scm \
-        clock-time emturner/clock.scm
+        clock-time emturner/clock.scm \
+        tinywl tinywl-core/wrapper.scm
 	GUILE_EXTENSIONS_PATH=$(GUIX_ENVIRONMENT)/lib:$(PWD):$(GUILE_EXTENSIONS_PATH) \
 		guile -L . -c '(use-modules (tinywl)) (check)'
 
 clean:
-	rm -f tinywl xdg-shell-protocol.h xdg-shell-protocol.c
+	rm -f tinywl.so xdg-shell-protocol.h xdg-shell-protocol.c
 
 .DEFAULT_GOAL=check
 .PHONY: clean
