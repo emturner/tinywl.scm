@@ -10,6 +10,7 @@
   #:use-module (wayland util)
   #:use-module (wlr types wlr-output)
   #:use-module (emturner util)
+  #:use-module (emturner clock)
   #:export (run check))
 
 ;; -----------------------------
@@ -267,6 +268,32 @@ screens in a physical layout."
   (new-output #:init-value (make <wl-listener>)
               #:accessor tinywl-server->new-output))
 
+(define-class <tinywl-output> (<wl-list>)
+  ;; struct tinywl_server *server;
+  (server #:getter tinywl-output->server
+          #:init-keyword #:server)
+  ;; struct wlr_output *wlr_output;
+  (output #:getter tinywl-output->wlr-output
+          #:init-keyword #:output)
+  ;; struct wl_listener frame;
+  (listener #:init-value (make <wl-listener>)
+            #:getter tinywl-output->frame
+            #:init-keyword #:frame))
+
+(define (output-frame tinywl-output)
+  "This function is called every time an output is ready to display a frame,
+generally at the output's refresh rate (e.g. 60Hz)."
+  (proc->wl-notify-func-t
+   (lambda (listener-raw-ptr data-raw-ptr)
+     (let ((server (tinywl-output->server tinywl-output))
+           (renderer (tinywl-server->renderer))
+           (now (clock-gettime->monotomic)))
+       ;; /* wlr_output_attach_render makes the OpenGL context current. */
+       (if (attach-render (tinywl-output->wlr-output tinywl-output))
+           (let ((res (effective-resolution tinywl-output->wlr-output tinywl-output)))
+             #f))))))
+
+
 (define (server-new-output-notify server)
   "This event is raised by the backend when a new output (aka a display
 or a monitor) becomes available."
@@ -281,7 +308,10 @@ or a monitor) becomes available."
       ;; pick the monitor's preferred mode, a more sophisticated
       ;; compositor would let the user configure it.
       (and (set-preferred-mode wlr-output)
-          '())))))
+           ;; Allocates and configures our state for this output
+           (make <tinywl-output>
+             #:output wlr-output
+             #:server server)))))) ;; FIXME: frame callback: static void output_frame
 
 (define (run verbosity)
   (wlr-log-init verbosity)
