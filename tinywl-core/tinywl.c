@@ -821,7 +821,6 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 SCM
 run(SCM startup_command)
 {
-	wlr_log_init(WLR_DEBUG, NULL);
 	char *startup_cmd = scm_to_utf8_stringn (startup_command, NULL); // make it null terminated
 
 	struct tinywl_server server;

@@ -12,17 +12,18 @@
   #:use-module (emturner util)
   #:use-module (emturner clock)
   #:use-module (tinywl-core wrapper)
+  #:use-module (ice-9 optargs)
   #:export (run check))
 
 ;; -----------------------------
 ;; Wrappers for 'wlr/util/log.h'
 ;; -----------------------------
 (define wlr-log-importance
-  (make-enumeration '(wlr-silent
-              wlr-error
-              wlr-info
-              wlr-debug
-              wlr-log-importance-last)))
+  (make-enumeration '(wlr-log-silent
+                      wlr-log-error
+                      wlr-log-info
+                      wlr-log-debug
+                      wlr-log-log-importance-last)))
 
 ;; TODO: Passes NULL callback - should be able to set this
 (define (wlr-log-init verbosity)
@@ -351,5 +352,11 @@ or a monitor) becomes available."
 ;; (define (check)
 ;;   (run 'wlr-error))
 
+(define* (gwwm-run #:key (startup-cmd #f)
+                         (log-level   'wlr-log-error))
+  (wlr-log-init log-level)
+  (tinywl-run startup-cmd))
+
 (define (check)
-  (tinywl-run "alacritty"))
+  (gwwm-run #:startup-cmd "alacritty"
+            #:log-level 'wlr-log-error))
