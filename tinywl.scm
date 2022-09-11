@@ -359,4 +359,4 @@ or a monitor) becomes available."
 
 (define (check)
   (gwwm-run #:startup-cmd "alacritty"
-            #:log-level 'wlr-log-error))
+            #:log-level 'wlr-log-debug))

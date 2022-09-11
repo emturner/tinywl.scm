@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
+#include <libguile.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -22,8 +23,6 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
-
-#include <libguile.h>
 
 /* For brevity's sake, struct members are annotated where they are used. */
 enum tinywl_cursor_mode {
@@ -251,10 +250,13 @@ static void server_new_pointer(struct tinywl_server *server,
 	 * is proxied through wlr_cursor. On another compositor, you might take this
 	 * opportunity to do libinput configuration on the device to set
 	 * acceleration, etc. */
+	wlr_log(WLR_INFO, "ENTRY: server_new_pointer");
 	wlr_cursor_attach_input_device(server->cursor, device);
+	wlr_log(WLR_INFO, "EXIT:  server_new_pointer");
 }
 
 static void server_new_input(struct wl_listener *listener, void *data) {
+	wlr_log(WLR_INFO, "ENTRY: server_new_input");
 	/* This event is raised by the backend when a new input device becomes
 	 * available. */
 	struct tinywl_server *server =
@@ -281,6 +283,7 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 }
 
 static void seat_request_cursor(struct wl_listener *listener, void *data) {
+	wlr_log(WLR_INFO, "ENTRY: seat_request_cursor");
 	struct tinywl_server *server = wl_container_of(
 			listener, server, request_cursor);
 	/* This event is rasied by the seat when a client provides a cursor image */
@@ -300,6 +303,7 @@ static void seat_request_cursor(struct wl_listener *listener, void *data) {
 }
 
 static void seat_request_set_selection(struct wl_listener *listener, void *data) {
+	wlr_log(WLR_INFO, "ENTRY: seat_request_set_selection");
 	/* This event is raised by the seat when a client wants to set the selection,
 	 * usually when the user copies something. wlroots allows compositors to
 	 * ignore such requests if they so choose, but in tinywl we always honor
@@ -313,6 +317,7 @@ static void seat_request_set_selection(struct wl_listener *listener, void *data)
 static bool view_at(struct tinywl_view *view,
 		double lx, double ly, struct wlr_surface **surface,
 		double *sx, double *sy) {
+	wlr_log(WLR_INFO, "ENTRY: view_at");
 	/*
 	 * XDG toplevels may have nested surfaces, such as popup windows for context
 	 * menus or tooltips. This function tests if any of those are underneath the
@@ -341,6 +346,8 @@ static bool view_at(struct tinywl_view *view,
 static struct tinywl_view *desktop_view_at(
 		struct tinywl_server *server, double lx, double ly,
 		struct wlr_surface **surface, double *sx, double *sy) {
+
+	wlr_log(WLR_INFO, "ENTRY: desktop_view_at");
 	/* This iterates over all of our surfaces and attempts to find one under the
 	 * cursor. This relies on server->views being ordered from top-to-bottom. */
 	struct tinywl_view *view;
@@ -353,9 +360,22 @@ static struct tinywl_view *desktop_view_at(
 }
 
 static void process_cursor_move(struct tinywl_server *server, uint32_t time) {
+	wlr_log(WLR_INFO, "ENTRY: process_cursor_move");
 	/* Move the grabbed view to the new position. */
+	wlr_log(WLR_DEBUG, "--- grab_x %f", server->grab_x);
+	wlr_log(WLR_DEBUG, "--- grab_y %f", server->grab_y);
+	wlr_log(WLR_DEBUG, "--- cursor_x %f", server->cursor->x);
+	wlr_log(WLR_DEBUG, "--- cursor_y %f", server->cursor->y);
+
+	wlr_log(WLR_DEBUG, "--- grabbed_x %f", server->grabbed_view->x);
+	wlr_log(WLR_DEBUG, "--- grabbed_y %f", server->grabbed_view->y);
+	wlr_log(WLR_DEBUG, "--- grabbed ptr %p", server->grabbed_view);
+
+	wlr_log(WLR_DEBUG, "--- diff_x %f", server->cursor->x - server->grab_x);
+	wlr_log(WLR_DEBUG, "--- diff_y %f", server->cursor->y - server->grab_y);
 	server->grabbed_view->x = server->cursor->x - server->grab_x;
 	server->grabbed_view->y = server->cursor->y - server->grab_y;
+	wlr_log(WLR_INFO, "EXIT: process_cursor_move");
 }
 
 static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
@@ -369,6 +389,8 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 	 * you'd wait for the client to prepare a buffer at the new size, then
 	 * commit any movement that was prepared.
 	 */
+	wlr_log(WLR_INFO, "ENTRY: process_cursor_resize");
+	wlr_log(WLR_DEBUG, "--- grabbed ptr %p", server->grabbed_view);
 	struct tinywl_view *view = server->grabbed_view;
 	double border_x = server->cursor->x - server->grab_x;
 	double border_y = server->cursor->y - server->grab_y;
@@ -411,6 +433,7 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 }
 
 static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
+	wlr_log(WLR_INFO, "ENTRY: process_cursor_motion");
 	/* If the mode is non-passthrough, delegate to those functions. */
 	if (server->cursor_mode == TINYWL_CURSOR_MOVE) {
 		process_cursor_move(server, time);
@@ -454,9 +477,11 @@ static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
 		 * the last client to have the cursor over it. */
 		wlr_seat_pointer_clear_focus(seat);
 	}
+	wlr_log(WLR_INFO, "EXIT:  process_cursor_motion");
 }
 
 static void server_cursor_motion(struct wl_listener *listener, void *data) {
+	wlr_log(WLR_INFO, "ENTRY: server_cursor_motion");
 	/* This event is forwarded by the cursor when a pointer emits a _relative_
 	 * pointer motion event (i.e. a delta) */
 	struct tinywl_server *server =
@@ -470,10 +495,12 @@ static void server_cursor_motion(struct wl_listener *listener, void *data) {
 	wlr_cursor_move(server->cursor, event->device,
 			event->delta_x, event->delta_y);
 	process_cursor_motion(server, event->time_msec);
+	wlr_log(WLR_INFO, "EXIT:  server_cursor_motion");
 }
 
 static void server_cursor_motion_absolute(
 		struct wl_listener *listener, void *data) {
+	wlr_log(WLR_INFO, "ENTRY: server_cursor_motion_absolute");
 	/* This event is forwarded by the cursor when a pointer emits an _absolute_
 	 * motion event, from 0..1 on each axis. This happens, for example, when
 	 * wlroots is running under a Wayland window rather than KMS+DRM, and you
@@ -488,6 +515,7 @@ static void server_cursor_motion_absolute(
 }
 
 static void server_cursor_button(struct wl_listener *listener, void *data) {
+	wlr_log(WLR_INFO, "ENTRY: server_cursor_button");
 	/* This event is forwarded by the cursor when a pointer emits a button
 	 * event. */
 	struct tinywl_server *server =
@@ -510,6 +538,7 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
 }
 
 static void server_cursor_axis(struct wl_listener *listener, void *data) {
+	wlr_log(WLR_INFO, "ENTRY: server_cursor_axis");
 	/* This event is forwarded by the cursor when a pointer emits an axis event,
 	 * for example when you move the scroll wheel. */
 	struct tinywl_server *server =
@@ -522,6 +551,7 @@ static void server_cursor_axis(struct wl_listener *listener, void *data) {
 }
 
 static void server_cursor_frame(struct wl_listener *listener, void *data) {
+	wlr_log(WLR_INFO, "ENTRY: server_cursor_frame");
 	/* This event is forwarded by the cursor when a pointer emits an frame
 	 * event. Frame events are sent after regular pointer events to group
 	 * multiple events together. For instance, two axis events may happen at the
@@ -616,7 +646,6 @@ static void output_frame(struct wl_listener *listener, void *data) {
 	if (!wlr_output_attach_render(output->wlr_output, NULL)) {
 		return;
 	}
-// HERE
 	/* The "effective" resolution can change if you rotate your outputs. */
 	int width, height;
 	wlr_output_effective_resolution(output->wlr_output, &width, &height);
@@ -672,7 +701,6 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	 * refresh rate), and each monitor supports only a specific set of modes. We
 	 * just pick the monitor's preferred mode, a more sophisticated compositor
 	 * would let the user configure it. */
-
 	if (!wl_list_empty(&wlr_output->modes)) {
 		struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
 		wlr_output_set_mode(wlr_output, mode);
@@ -687,7 +715,6 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 		calloc(1, sizeof(struct tinywl_output));
 	output->wlr_output = wlr_output;
 	output->server = server;
-	//HERE
 	/* Sets up a listener for the frame notify event. */
 	output->frame.notify = output_frame;
 	wl_signal_add(&wlr_output->events.frame, &output->frame);
@@ -727,6 +754,7 @@ static void xdg_surface_destroy(struct wl_listener *listener, void *data) {
 
 static void begin_interactive(struct tinywl_view *view,
 		enum tinywl_cursor_mode mode, uint32_t edges) {
+	wlr_log(WLR_DEBUG, "ENTRY: begin_interactive");
 	/* This function sets up an interactive move or resize operation, where the
 	 * compositor stops propegating pointer events to clients and instead
 	 * consumes them itself, to move or resize windows. */
@@ -737,6 +765,7 @@ static void begin_interactive(struct tinywl_view *view,
 		/* Deny move/resize requests from unfocused clients. */
 		return;
 	}
+	wlr_log(WLR_DEBUG, "--- grabbed ptr %p", server->grabbed_view);
 	server->grabbed_view = view;
 	server->cursor_mode = mode;
 
@@ -824,6 +853,8 @@ run(SCM startup_command)
 	char *startup_cmd = scm_to_utf8_stringn (startup_command, NULL); // make it null terminated
 
 	struct tinywl_server server;
+	wlr_log(WLR_DEBUG, "--- grabbed ptr %p", server.grabbed_view);
+	server.cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
 	/* The Wayland display is managed by libwayland. It handles accepting
 	 * clients from the Unix socket, manging Wayland globals, and so on. */
 	server.wl_display = wl_display_create();
@@ -855,7 +886,6 @@ run(SCM startup_command)
 	/* Configure a listener to be notified when new outputs are available on the
 	 * backend. */
 	wl_list_init(&server.outputs);
-//HERE
 	server.new_output.notify = server_new_output;
 	wl_signal_add(&server.backend->events.new_output, &server.new_output);
 
@@ -946,6 +976,7 @@ run(SCM startup_command)
 	setenv("WAYLAND_DISPLAY", socket, true);
 	if (startup_cmd) {
 		if (fork() == 0) {
+			wlr_log(WLR_INFO, "Running startup command: %s", startup_cmd);
 			execl("/bin/sh", "/bin/sh", "-c", startup_cmd, (void *)NULL);
 		}
 	}
