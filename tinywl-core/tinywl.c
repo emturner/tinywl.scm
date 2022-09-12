@@ -31,6 +31,10 @@ enum tinywl_cursor_mode {
 	TINYWL_CURSOR_RESIZE,
 };
 
+struct tinywl_server;
+
+typedef bool (*handle_keybinding_t)(struct tinywl_server *server, xkb_keysym_t sym);
+
 struct tinywl_server {
 	struct wl_display *wl_display;
 	struct wlr_backend *backend;
@@ -62,6 +66,7 @@ struct tinywl_server {
 	struct wlr_output_layout *output_layout;
 	struct wl_list outputs;
 	struct wl_listener new_output;
+	handle_keybinding_t handle_keybinding;
 };
 
 struct tinywl_output {
@@ -202,7 +207,7 @@ static void keyboard_handle_key(
 		/* If alt is held down and this button was _pressed_, we attempt to
 		 * process it as a compositor keybinding. */
 		for (int i = 0; i < nsyms; i++) {
-			handled = handle_keybinding(server, syms[i]);
+			handled = server->handle_keybinding(server, syms[i]);
 		}
 	}
 
@@ -853,6 +858,8 @@ run(SCM startup_command)
 	char *startup_cmd = scm_to_utf8_stringn (startup_command, NULL); // make it null terminated
 
 	struct tinywl_server server;
+	server.handle_keybinding = handle_keybinding;
+
 	wlr_log(WLR_DEBUG, "--- grabbed ptr %p", server.grabbed_view);
 	server.cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
 	/* The Wayland display is managed by libwayland. It handles accepting
