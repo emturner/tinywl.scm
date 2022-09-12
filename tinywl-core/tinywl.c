@@ -853,12 +853,13 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 }
 
 SCM
-run(SCM startup_command)
+run(SCM startup_command, SCM handle_keybinding)
 {
 	char *startup_cmd = scm_to_utf8_stringn (startup_command, NULL); // make it null terminated
+	handle_keybinding_t handle_kb = scm_to_pointer (handle_keybinding);
 
 	struct tinywl_server server;
-	server.handle_keybinding = handle_keybinding;
+	server.handle_keybinding = handle_kb;
 
 	wlr_log(WLR_DEBUG, "--- grabbed ptr %p", server.grabbed_view);
 	server.cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
@@ -1001,8 +1002,15 @@ run(SCM startup_command)
 	return scm_from_int(0);
 }
 
+SCM
+handle_keybinding_wrapper(void)
+{
+	return scm_from_pointer(handle_keybinding, NULL); // NULL finalizer
+}
+
 void
 init_tinywl_wrapper (void)
 {
-    scm_c_define_gsubr("run", 1, 0, 0, run);
+    scm_c_define_gsubr("run", 2, 0, 0, run);
+	scm_c_define_gsubr("handle-keybinding", 0, 0, 0, handle_keybinding_wrapper);
 }

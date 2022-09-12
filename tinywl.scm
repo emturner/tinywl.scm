@@ -353,9 +353,10 @@ or a monitor) becomes available."
 ;;   (run 'wlr-error))
 
 (define* (gwwm-run #:key (startup-cmd #f)
-                         (log-level   'wlr-log-error))
+                         (log-level   'wlr-log-error)
+                         (handle-kb   (get-handle-keybinding)))
   (wlr-log-init log-level)
-  (tinywl-run startup-cmd))
+  (tinywl-run startup-cmd handle-kb))
 
 (define (check)
   (gwwm-run #:startup-cmd "alacritty"
