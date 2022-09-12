@@ -19,5 +19,6 @@
    (handle-keybinding)))
 
 (define (tinywl-run startup-cmd handle-keybinding)
-  (let ((handle-kb (unwrap-tinywl-handle-keybinding handle-keybinding)))
-    (run startup-cmd handle-kb)))
+  (let ((handle-kb (unwrap-tinywl-handle-keybinding handle-keybinding))
+        (server-raw (init-server)))
+    (run server-raw startup-cmd handle-kb)))

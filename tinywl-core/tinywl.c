@@ -153,38 +153,6 @@ static void keyboard_handle_modifiers(
 		&keyboard->device->keyboard->modifiers);
 }
 
-static bool handle_keybinding(struct tinywl_server *server, xkb_keysym_t sym) {
-	/*
-	 * Here we handle compositor keybindings. This is when the compositor is
-	 * processing keys, rather than passing them on to the client for its own
-	 * processing.
-	 *
-	 * This function assumes Alt is held down.
-	 */
-	switch (sym) {
-	case XKB_KEY_Escape:
-		wl_display_terminate(server->wl_display);
-		break;
-	case XKB_KEY_F1:
-		/* Cycle to the next view */
-		if (wl_list_length(&server->views) < 2) {
-			break;
-		}
-		struct tinywl_view *current_view = wl_container_of(
-			server->views.next, current_view, link);
-		struct tinywl_view *next_view = wl_container_of(
-			current_view->link.next, next_view, link);
-		focus_view(next_view, next_view->xdg_surface->surface);
-		/* Move the previous view to the end of the list */
-		wl_list_remove(&current_view->link);
-		wl_list_insert(server->views.prev, &current_view->link);
-		break;
-	default:
-		return false;
-	}
-	return true;
-}
-
 static void keyboard_handle_key(
 		struct wl_listener *listener, void *data) {
 	/* This event is raised when a key is pressed or released. */
@@ -853,30 +821,30 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 }
 
 SCM
-run(SCM startup_command, SCM handle_keybinding)
+run(SCM svr, SCM startup_command, SCM handle_keybinding)
 {
+	struct tinywl_server* server = scm_to_pointer(svr);
 	char *startup_cmd = scm_to_utf8_stringn (startup_command, NULL); // make it null terminated
 	handle_keybinding_t handle_kb = scm_to_pointer (handle_keybinding);
 
-	struct tinywl_server server;
-	server.handle_keybinding = handle_kb;
+	server->handle_keybinding = handle_kb;
 
-	wlr_log(WLR_DEBUG, "--- grabbed ptr %p", server.grabbed_view);
-	server.cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
+	wlr_log(WLR_DEBUG, "--- grabbed ptr %p", server->grabbed_view);
+	server->cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
 	/* The Wayland display is managed by libwayland. It handles accepting
 	 * clients from the Unix socket, manging Wayland globals, and so on. */
-	server.wl_display = wl_display_create();
+	server->wl_display = wl_display_create();
 	/* The backend is a wlroots feature which abstracts the underlying input and
 	 * output hardware. The autocreate option will choose the most suitable
 	 * backend based on the current environment, such as opening an X11 window
 	 * if an X11 server is running. */
-	server.backend = wlr_backend_autocreate(server.wl_display);
+	server->backend = wlr_backend_autocreate(server->wl_display);
 
 	/* If we don't provide a renderer, autocreate makes a GLES2 renderer for us.
 	 * The renderer is responsible for defining the various pixel formats it
 	 * supports for shared memory, this configures that for clients. */
-	server.renderer = wlr_backend_get_renderer(server.backend);
-	wlr_renderer_init_wl_display(server.renderer, server.wl_display);
+	server->renderer = wlr_backend_get_renderer(server->backend);
+	wlr_renderer_init_wl_display(server->renderer, server->wl_display);
 
 	/* This creates some hands-off wlroots interfaces. The compositor is
 	 * necessary for clients to allocate surfaces and the data device manager
@@ -884,18 +852,18 @@ run(SCM startup_command, SCM handle_keybinding)
 	 * to dig your fingers in and play with their behavior if you want. Note that
 	 * the clients cannot set the selection directly without compositor approval,
 	 * see the handling of the request_set_selection event below.*/
-	wlr_compositor_create(server.wl_display, server.renderer);
-	wlr_data_device_manager_create(server.wl_display);
+	wlr_compositor_create(server->wl_display, server->renderer);
+	wlr_data_device_manager_create(server->wl_display);
 
 	/* Creates an output layout, which a wlroots utility for working with an
 	 * arrangement of screens in a physical layout. */
-	server.output_layout = wlr_output_layout_create();
+	server->output_layout = wlr_output_layout_create();
 
 	/* Configure a listener to be notified when new outputs are available on the
 	 * backend. */
-	wl_list_init(&server.outputs);
-	server.new_output.notify = server_new_output;
-	wl_signal_add(&server.backend->events.new_output, &server.new_output);
+	wl_list_init(&server->outputs);
+	server->new_output.notify = server_new_output;
+	wl_signal_add(&server->backend->events.new_output, &server->new_output);
 
 	/* Set up our list of views and the xdg-shell. The xdg-shell is a Wayland
 	 * protocol which is used for application windows. For more detail on
@@ -903,25 +871,25 @@ run(SCM startup_command, SCM handle_keybinding)
 	 *
 	 * https://drewdevault.com/2018/07/29/Wayland-shells.html
 	 */
-	wl_list_init(&server.views);
-	server.xdg_shell = wlr_xdg_shell_create(server.wl_display);
-	server.new_xdg_surface.notify = server_new_xdg_surface;
-	wl_signal_add(&server.xdg_shell->events.new_surface,
-			&server.new_xdg_surface);
+	wl_list_init(&server->views);
+	server->xdg_shell = wlr_xdg_shell_create(server->wl_display);
+	server->new_xdg_surface.notify = server_new_xdg_surface;
+	wl_signal_add(&server->xdg_shell->events.new_surface,
+			&server->new_xdg_surface);
 
 	/*
 	 * Creates a cursor, which is a wlroots utility for tracking the cursor
 	 * image shown on screen.
 	 */
-	server.cursor = wlr_cursor_create();
-	wlr_cursor_attach_output_layout(server.cursor, server.output_layout);
+	server->cursor = wlr_cursor_create();
+	wlr_cursor_attach_output_layout(server->cursor, server->output_layout);
 
 	/* Creates an xcursor manager, another wlroots utility which loads up
 	 * Xcursor themes to source cursor images from and makes sure that cursor
 	 * images are available at all scale factors on the screen (necessary for
 	 * HiDPI support). We add a cursor theme at scale factor 1 to begin with. */
-	server.cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
-	wlr_xcursor_manager_load(server.cursor_mgr, 1);
+	server->cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
+	wlr_xcursor_manager_load(server->cursor_mgr, 1);
 
 	/*
 	 * wlr_cursor *only* displays an image on screen. It does not move around
@@ -935,17 +903,17 @@ run(SCM startup_command, SCM handle_keybinding)
 	 *
 	 * And more comments are sprinkled throughout the notify functions above.
 	 */
-	server.cursor_motion.notify = server_cursor_motion;
-	wl_signal_add(&server.cursor->events.motion, &server.cursor_motion);
-	server.cursor_motion_absolute.notify = server_cursor_motion_absolute;
-	wl_signal_add(&server.cursor->events.motion_absolute,
-			&server.cursor_motion_absolute);
-	server.cursor_button.notify = server_cursor_button;
-	wl_signal_add(&server.cursor->events.button, &server.cursor_button);
-	server.cursor_axis.notify = server_cursor_axis;
-	wl_signal_add(&server.cursor->events.axis, &server.cursor_axis);
-	server.cursor_frame.notify = server_cursor_frame;
-	wl_signal_add(&server.cursor->events.frame, &server.cursor_frame);
+	server->cursor_motion.notify = server_cursor_motion;
+	wl_signal_add(&server->cursor->events.motion, &server->cursor_motion);
+	server->cursor_motion_absolute.notify = server_cursor_motion_absolute;
+	wl_signal_add(&server->cursor->events.motion_absolute,
+			&server->cursor_motion_absolute);
+	server->cursor_button.notify = server_cursor_button;
+	wl_signal_add(&server->cursor->events.button, &server->cursor_button);
+	server->cursor_axis.notify = server_cursor_axis;
+	wl_signal_add(&server->cursor->events.axis, &server->cursor_axis);
+	server->cursor_frame.notify = server_cursor_frame;
+	wl_signal_add(&server->cursor->events.frame, &server->cursor_frame);
 
 	/*
 	 * Configures a seat, which is a single "seat" at which a user sits and
@@ -953,29 +921,29 @@ run(SCM startup_command, SCM handle_keybinding)
 	 * pointer, touch, and drawing tablet device. We also rig up a listener to
 	 * let us know when new input devices are available on the backend.
 	 */
-	wl_list_init(&server.keyboards);
-	server.new_input.notify = server_new_input;
-	wl_signal_add(&server.backend->events.new_input, &server.new_input);
-	server.seat = wlr_seat_create(server.wl_display, "seat0");
-	server.request_cursor.notify = seat_request_cursor;
-	wl_signal_add(&server.seat->events.request_set_cursor,
-			&server.request_cursor);
-	server.request_set_selection.notify = seat_request_set_selection;
-	wl_signal_add(&server.seat->events.request_set_selection,
-			&server.request_set_selection);
+	wl_list_init(&server->keyboards);
+	server->new_input.notify = server_new_input;
+	wl_signal_add(&server->backend->events.new_input, &server->new_input);
+	server->seat = wlr_seat_create(server->wl_display, "seat0");
+	server->request_cursor.notify = seat_request_cursor;
+	wl_signal_add(&server->seat->events.request_set_cursor,
+			&server->request_cursor);
+	server->request_set_selection.notify = seat_request_set_selection;
+	wl_signal_add(&server->seat->events.request_set_selection,
+			&server->request_set_selection);
 
 	/* Add a Unix socket to the Wayland display. */
-	const char *socket = wl_display_add_socket_auto(server.wl_display);
+	const char *socket = wl_display_add_socket_auto(server->wl_display);
 	if (!socket) {
-		wlr_backend_destroy(server.backend);
+		wlr_backend_destroy(server->backend);
 		return scm_from_int(1);
 	}
 
 	/* Start the backend. This will enumerate outputs and inputs, become the DRM
 	 * master, etc */
-	if (!wlr_backend_start(server.backend)) {
-		wlr_backend_destroy(server.backend);
-		wl_display_destroy(server.wl_display);
+	if (!wlr_backend_start(server->backend)) {
+		wlr_backend_destroy(server->backend);
+		wl_display_destroy(server->wl_display);
 		return scm_from_int(1);
 	}
 
@@ -994,12 +962,51 @@ run(SCM startup_command, SCM handle_keybinding)
 	 * frame events at the refresh rate, and so on. */
 	wlr_log(WLR_INFO, "Running Wayland compositor on WAYLAND_DISPLAY=%s",
 			socket);
-	wl_display_run(server.wl_display);
+	wl_display_run(server->wl_display);
 
-	/* Once wl_display_run returns, we shut down the server. */
-	wl_display_destroy_clients(server.wl_display);
-	wl_display_destroy(server.wl_display);
+	/* Once wl_display_run returns, we shut down the server-> */
+	wl_display_destroy_clients(server->wl_display);
+	wl_display_destroy(server->wl_display);
 	return scm_from_int(0);
+}
+
+static bool handle_keybinding(struct tinywl_server *server, xkb_keysym_t sym) {
+	/*
+	 * Here we handle compositor keybindings. This is when the compositor is
+	 * processing keys, rather than passing them on to the client for its own
+	 * processing.
+	 *
+	 * This function assumes Alt is held down.
+	 */
+	switch (sym) {
+	case XKB_KEY_Escape:
+		wl_display_terminate(server->wl_display);
+		break;
+	case XKB_KEY_F1:
+		/* Cycle to the next view */
+		if (wl_list_length(&server->views) < 2) {
+			break;
+		}
+		struct tinywl_view *current_view = wl_container_of(
+			server->views.next, current_view, link);
+		struct tinywl_view *next_view = wl_container_of(
+			current_view->link.next, next_view, link);
+		focus_view(next_view, next_view->xdg_surface->surface);
+		/* Move the previous view to the end of the list */
+		wl_list_remove(&current_view->link);
+		wl_list_insert(server->views.prev, &current_view->link);
+		break;
+	default:
+		return false;
+	}
+	return true;
+}
+
+SCM
+init_server(void)
+{
+	struct tinywl_server* server = malloc(sizeof(*server));
+	return scm_from_pointer(server, NULL); // NULL finalizer
 }
 
 SCM
@@ -1011,6 +1018,7 @@ handle_keybinding_wrapper(void)
 void
 init_tinywl_wrapper (void)
 {
-    scm_c_define_gsubr("run", 2, 0, 0, run);
+    scm_c_define_gsubr("init-server", 0, 0, 0, init_server);
+    scm_c_define_gsubr("run", 3, 0, 0, run);
 	scm_c_define_gsubr("handle-keybinding", 0, 0, 0, handle_keybinding_wrapper);
 }
