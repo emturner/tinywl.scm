@@ -15,8 +15,10 @@
             wl-listener-c-type
             wl-display
             wl-display-create
+            wl-display-terminate
             wl-signal-c-type)
-  #:export-syntax (unwrap-wl-display))
+  #:export-syntax (unwrap-wl-display
+                   wrap-wl-display))
 
 (define-wrapped-pointer-type wl-display
   wl-display?
@@ -32,6 +34,14 @@
     (lambda ()
       "Create a wl-display"
       (wrap-wl-display (create)))))
+
+(define wl-display-terminate
+  (let ((terminate (foreign-library-function wlroots "wl_display_terminate"
+                      #:return-type void
+                      #:arg-types '(*))))
+    (lambda (wl-display)
+      "Terminate a wl-display"
+      (terminate (unwrap-wl-display wl-display)))))
 
 ;;  "A wl-notify-func-t expects a *wl_listener, and a void* data."
 (define-wrapped-pointer-type wl-notify-func-t

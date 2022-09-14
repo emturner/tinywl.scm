@@ -33,7 +33,7 @@ enum tinywl_cursor_mode {
 
 struct tinywl_server;
 
-typedef bool (*handle_keybinding_t)(struct tinywl_server *server, xkb_keysym_t sym);
+typedef bool (*handle_keybinding_t)(xkb_keysym_t sym);
 
 struct tinywl_server {
 	struct wl_display *wl_display;
@@ -175,7 +175,7 @@ static void keyboard_handle_key(
 		/* If alt is held down and this button was _pressed_, we attempt to
 		 * process it as a compositor keybinding. */
 		for (int i = 0; i < nsyms; i++) {
-			handled = server->handle_keybinding(server, syms[i]);
+			handled = server->handle_keybinding(syms[i]);
 		}
 	}
 
@@ -970,36 +970,22 @@ run(SCM svr, SCM startup_command, SCM handle_keybinding)
 	return scm_from_int(0);
 }
 
-static bool handle_keybinding(struct tinywl_server *server, xkb_keysym_t sym) {
-	/*
-	 * Here we handle compositor keybindings. This is when the compositor is
-	 * processing keys, rather than passing them on to the client for its own
-	 * processing.
-	 *
-	 * This function assumes Alt is held down.
-	 */
-	switch (sym) {
-	case XKB_KEY_Escape:
-		wl_display_terminate(server->wl_display);
-		break;
-	case XKB_KEY_F1:
-		/* Cycle to the next view */
-		if (wl_list_length(&server->views) < 2) {
-			break;
-		}
-		struct tinywl_view *current_view = wl_container_of(
-			server->views.next, current_view, link);
-		struct tinywl_view *next_view = wl_container_of(
-			current_view->link.next, next_view, link);
-		focus_view(next_view, next_view->xdg_surface->surface);
-		/* Move the previous view to the end of the list */
-		wl_list_remove(&current_view->link);
-		wl_list_insert(server->views.prev, &current_view->link);
-		break;
-	default:
-		return false;
+static SCM focus_next_view(SCM svr) {
+	struct tinywl_server* server = scm_to_pointer(svr);
+	/* Cycle to the next view */
+	if (wl_list_length(&server->views) < 2) {
+		return SCM_BOOL_T;
 	}
-	return true;
+
+	struct tinywl_view *current_view = wl_container_of(
+		server->views.next, current_view, link);
+	struct tinywl_view *next_view = wl_container_of(
+		current_view->link.next, next_view, link);
+	focus_view(next_view, next_view->xdg_surface->surface);
+	/* Move the previous view to the end of the list */
+	wl_list_remove(&current_view->link);
+	wl_list_insert(server->views.prev, &current_view->link);
+	return SCM_BOOL_T;
 }
 
 SCM
@@ -1010,15 +996,17 @@ init_server(void)
 }
 
 SCM
-handle_keybinding_wrapper(void)
+server_to_wl_display(SCM svr)
 {
-	return scm_from_pointer(handle_keybinding, NULL); // NULL finalizer
+	struct tinywl_server* server = scm_to_pointer(svr);
+	return scm_from_pointer(server->wl_display, NULL); // NULL finalizer
 }
 
 void
 init_tinywl_wrapper (void)
 {
     scm_c_define_gsubr("init-server", 0, 0, 0, init_server);
+    scm_c_define_gsubr("server-get-wl-display", 1, 0, 0, server_to_wl_display);
     scm_c_define_gsubr("run", 3, 0, 0, run);
-	scm_c_define_gsubr("handle-keybinding", 0, 0, 0, handle_keybinding_wrapper);
+	scm_c_define_gsubr("focus-next-view", 1, 0, 0, focus_next_view);
 }

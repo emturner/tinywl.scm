@@ -4,6 +4,7 @@
   #:use-module (rnrs enums)
   #:use-module (srfi srfi-9)
   #:use-module (ice-9 format)
+  #:use-module (ice-9 match)
   #:use-module (oop goops)
   #:use-module (wayland-server-core)
   #:use-module (wayland dylib)
@@ -352,9 +353,30 @@ or a monitor) becomes available."
 ;; (define (check)
 ;;   (run 'wlr-error))
 
+(define (make-handle-keybinding server)
+  (procedure->pointer
+   cstdbool
+   (lambda (sym)
+     "Here we handle compositor keybindings. This is when the compositor is processing keys,
+rather than passing them on to the client for its own processing.
+
+This function assumes Win is held down."
+     (let ((result (match sym
+                     ;; XKB_KEY_Escape
+                     (#xff1b
+                      (or (wl-display-terminate (server->wl-display server))
+                          #t))
+                     ;; XKB_KEY_F1
+                     (#xffbe
+                      (tinywl-cycle-focus-next-view server))
+                     ;; default
+                     (_ #f))))
+       (bool->cstdbool result)))
+   `(,uint32)))
+
 (define* (gwwm-run #:key (startup-cmd #f)
                          (log-level   'wlr-log-error)
-                         (handle-kb   (get-handle-keybinding)))
+                         (handle-kb   make-handle-keybinding))
   (wlr-log-init log-level)
   (tinywl-run startup-cmd handle-kb))
 
