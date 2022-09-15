@@ -18,4 +18,4 @@
   (not (eq? 0 cbool)))
 
 (define-public (bool->cstdbool bool)
-  (if bool 0 1))
+  (if bool 1 0))

@@ -171,15 +171,20 @@ static void keyboard_handle_key(
 
 	bool handled = false;
 	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->device->keyboard);
-	if ((modifiers & WLR_MODIFIER_LOGO) && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+	if ((modifiers & WLR_MODIFIER_ALT) && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		/* If alt is held down and this button was _pressed_, we attempt to
 		 * process it as a compositor keybinding. */
 		for (int i = 0; i < nsyms; i++) {
+			wlr_log(WLR_DEBUG, "--- handle keybinding");
 			handled = server->handle_keybinding(syms[i]);
+			if (handled) {
+				wlr_log(WLR_DEBUG, "--- handled!!");
+			}
 		}
 	}
 
 	if (!handled) {
+		wlr_log(WLR_DEBUG, "--- keypress not handled");
 		/* Otherwise, we pass it along to the client. */
 		wlr_seat_set_keyboard(seat, keyboard->device);
 		wlr_seat_keyboard_notify_key(seat, event->time_msec,

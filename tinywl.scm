@@ -360,7 +360,7 @@ or a monitor) becomes available."
      "Here we handle compositor keybindings. This is when the compositor is processing keys,
 rather than passing them on to the client for its own processing.
 
-This function assumes Win is held down."
+This function assumes Alt is held down."
      (let ((result (match sym
                      ;; XKB_KEY_Escape
                      (#xff1b
