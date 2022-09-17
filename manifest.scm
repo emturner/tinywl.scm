@@ -7,6 +7,7 @@
     "pkg-config"
     "eudev"
     "libinput"
+;;    "libseat"
     "libxkbcommon"
     "mesa"
     "pixman"
@@ -16,6 +17,7 @@
     "xcb-util-errors"
     "xcb-util-wm"
     "xorg-server-xwayland"
+;;    "elogind"
 
     ;; tinywl.scm
     "guile"

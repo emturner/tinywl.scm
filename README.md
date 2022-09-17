@@ -45,3 +45,8 @@ Notable omissions from TinyWL:
   omitted for brevity.
 - Damage tracking, which tracks which parts of the screen are changing and
   minimizes redraws accordingly.
+
+# Licensing
+The tinywl.c file, Makefile & README were originally copied from wlroots/tinywl and was licensed under CC0-1.0.
+xdg-shell-protocol.c/h are generated and licensed under MIT
+All .scm files are licensed under MIT

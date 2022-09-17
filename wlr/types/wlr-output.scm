@@ -15,7 +15,8 @@
             unwrap-wlr-output-ptr
             wlr-output-c-type
             <wlr-output>
-            set-preferred-mode))
+            set-preferred-mode
+            attach-render))
 
 ;; Wrapper for <wlr/types/wlr_output.h>
 ;; WARNING: use of unstable api
@@ -194,3 +195,53 @@ On failure, the pending changes are rolled back."
                              (wlr-output->self self))))
         (set-mode self preferred-mode)
         (wlr-output-commit (wlr-output->self self)))))
+
+(define wlr-output-attach-render
+  (let ((f (foreign-library-function wlroots "wlr_output_attach_render"
+                                     #:return-type cstdbool
+                                     #:arg-types '(* *))))
+    (lambda (wlr-output)
+      "
+/**
+ * Attach the renderer's buffer to the output. Compositors must call this
+ * function before rendering. After they are done rendering, they should call
+ * `wlr_output_commit` to submit the new frame. The output needs to be
+ * enabled.
+ *
+ * If non-NULL, `buffer_age` is set to the drawing buffer age in number of
+ * frames or -1 if unknown. This is useful for damage tracking.
+ *
+ * If the compositor decides not to render after calling this function, it
+ * must call wlr_output_rollback.
+ */
+"
+       (cstdbool->bool (f (unwrap-wlr-output-ptr wlr-output)
+                          %null-pointer)))))
+
+(define-method (attach-render (self <wlr-output>))
+  (wlr-output-attach-render (wlr-output->self self)))
+
+(define wlr-output-effective-resolution
+  (let ((f (foreign-library-function wlroots "wlr_output_effective_resolution"
+                                     #:return-type void
+                                     #:arg-types '(* *))))
+    (lambda (wlr-output)
+      "
+/**
+ * Attach the renderer's buffer to the output. Compositors must call this
+ * function before rendering. After they are done rendering, they should call
+ * `wlr_output_commit` to submit the new frame. The output needs to be
+ * enabled.
+ *
+ * If non-NULL, `buffer_age` is set to the drawing buffer age in number of
+ * frames or -1 if unknown. This is useful for damage tracking.
+ *
+ * If the compositor decides not to render after calling this function, it
+ * must call wlr_output_rollback.
+ */
+"
+       (cstdbool->bool (f (unwrap-wlr-output-ptr wlr-output)
+                          %null-pointer)))))
+
+(define-method (attach-render (self <wlr-output>))
+  (wlr-output-attach-render (wlr-output->self self)))

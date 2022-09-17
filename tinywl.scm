@@ -4,23 +4,27 @@
   #:use-module (rnrs enums)
   #:use-module (srfi srfi-9)
   #:use-module (ice-9 format)
+  #:use-module (ice-9 match)
   #:use-module (oop goops)
   #:use-module (wayland-server-core)
   #:use-module (wayland dylib)
   #:use-module (wayland util)
   #:use-module (wlr types wlr-output)
   #:use-module (emturner util)
+  #:use-module (emturner clock)
+  #:use-module (tinywl-core wrapper)
+  #:use-module (ice-9 optargs)
   #:export (run check))
 
 ;; -----------------------------
 ;; Wrappers for 'wlr/util/log.h'
 ;; -----------------------------
 (define wlr-log-importance
-  (make-enumeration '(wlr-silent
-              wlr-error
-              wlr-info
-              wlr-debug
-              wlr-log-importance-last)))
+  (make-enumeration '(wlr-log-silent
+                      wlr-log-error
+                      wlr-log-info
+                      wlr-log-debug
+                      wlr-log-log-importance-last)))
 
 ;; TODO: Passes NULL callback - should be able to set this
 (define (wlr-log-init verbosity)
@@ -267,6 +271,32 @@ screens in a physical layout."
   (new-output #:init-value (make <wl-listener>)
               #:accessor tinywl-server->new-output))
 
+(define-class <tinywl-output> (<wl-list>)
+  ;; struct tinywl_server *server;
+  (server #:getter tinywl-output->server
+          #:init-keyword #:server)
+  ;; struct wlr_output *wlr_output;
+  (output #:getter tinywl-output->wlr-output
+          #:init-keyword #:output)
+  ;; struct wl_listener frame;
+  (listener #:init-value (make <wl-listener>)
+            #:getter tinywl-output->frame
+            #:init-keyword #:frame))
+
+;; (define (output-frame tinywl-output)
+;;   "This function is called every time an output is ready to display a frame,
+;; generally at the output's refresh rate (e.g. 60Hz)."
+;;   (proc->wl-notify-func-t
+;;    (lambda (listener-raw-ptr data-raw-ptr)
+;;      (let ((server (tinywl-output->server tinywl-output))
+;;            (renderer (tinywl-server->renderer))
+;;            (now (clock-gettime->monotomic)))
+;;        ;; /* wlr_output_attach_render makes the OpenGL context current. */
+;;        (if (attach-render (tinywl-output->wlr-output tinywl-output))
+;;            (let ((res (effective-resolution tinywl-output->wlr-output tinywl-output)))
+;;              #f))))))
+
+
 (define (server-new-output-notify server)
   "This event is raised by the backend when a new output (aka a display
 or a monitor) becomes available."
@@ -281,41 +311,75 @@ or a monitor) becomes available."
       ;; pick the monitor's preferred mode, a more sophisticated
       ;; compositor would let the user configure it.
       (and (set-preferred-mode wlr-output)
-          '())))))
+           ;; Allocates and configures our state for this output
+           (make <tinywl-output>
+             #:output wlr-output
+             #:server server)))))) ;; FIXME: frame callback: static void output_frame
 
-(define (run verbosity)
-  (wlr-log-init verbosity)
-  ;; TODO: startup command
-  (define server (make <tinywl-server>))
-  ;; The wayland display is managed by libwayland. It handles accepting
-  ;; clients from the Unix socket, managing Wayland globals, and so on.
-  (set! (tinywl-server->display server) (wl-display-create))
-  ;; The backend is a wlroots feature which abstracts the underlying input
-  ;; and output hardware. The autocreate option will choose the most
-  ;; suitable backend based on the current environment, such as opening
-  ;; an X11 window if an X11 server is running.
-  (set! (tinywl-server->backend server)
-        (wlr-backend-auto-create (tinywl-server->display server)))
-  ;; If we don't provide a renderer, autocreate makes a GLES2 renderr for
-  ;; us.  The renderer is responsible for defining the various pixel
-  ;; formats it supports for shared memory, this configures that for
-  ;; clients.
-  (set! (tinywl-server->renderer server)
-        (wlr-renderer-auto-create (tinywl-server->backend server)))
-  (or (wlr-renderer-init-wl-display
-       (tinywl-server->renderer server)
-       (tinywl-server->display server))
-      (throw "failed to initialise wl-display"))
-  (wlr-compositor-create (tinywl-server->display server)
-                         (tinywl-server->renderer server))
-  (wlr-data-device-manager-create (tinywl-server->display server))
-  (set! (tinywl-server->output-layout server)
-        (wlr-output-layout-create))
+;; (define (run verbosity)
+;;   (wlr-log-init verbosity)
+;;   ;; TODO: startup command
+;;   (define server (make <tinywl-server>))
+;;   ;; The wayland display is managed by libwayland. It handles accepting
+;;   ;; clients from the Unix socket, managing Wayland globals, and so on.
+;;   (set! (tinywl-server->display server) (wl-display-create))
+;;   ;; The backend is a wlroots feature which abstracts the underlying input
+;;   ;; and output hardware. The autocreate option will choose the most
+;;   ;; suitable backend based on the current environment, such as opening
+;;   ;; an X11 window if an X11 server is running.
+;;   (set! (tinywl-server->backend server)
+;;         (wlr-backend-auto-create (tinywl-server->display server)))
+;;   ;; If we don't provide a renderer, autocreate makes a GLES2 renderr for
+;;   ;; us.  The renderer is responsible for defining the various pixel
+;;   ;; formats it supports for shared memory, this configures that for
+;;   ;; clients.
+;;   (set! (tinywl-server->renderer server)
+;;         (wlr-renderer-auto-create (tinywl-server->backend server)))
+;;   (or (wlr-renderer-init-wl-display
+;;        (tinywl-server->renderer server)
+;;        (tinywl-server->display server))
+;;       (throw "failed to initialise wl-display"))
+;;   (wlr-compositor-create (tinywl-server->display server)
+;;                          (tinywl-server->renderer server))
+;;   (wlr-data-device-manager-create (tinywl-server->display server))
+;;   (set! (tinywl-server->output-layout server)
+;;         (wlr-output-layout-create))
 
-  ;; TODO Configure a listener to be notified when new outputs are available
-  ;; on the backend.
-  ;; (server_new_output_notify ('(todo func)))
-  server)
+;;   ;; TODO Configure a listener to be notified when new outputs are available
+;;   ;; on the backend.
+;;   ;; (server_new_output_notify ('(todo func)))
+;;   server)
+
+;; (define (check)
+;;   (run 'wlr-error))
+
+(define (make-handle-keybinding server)
+  (procedure->pointer
+   cstdbool
+   (lambda (sym)
+     "Here we handle compositor keybindings. This is when the compositor is processing keys,
+rather than passing them on to the client for its own processing.
+
+This function assumes Alt is held down."
+     (let ((result (match sym
+                     ;; XKB_KEY_Escape
+                     (#xff1b
+                      (or (wl-display-terminate (server->wl-display server))
+                          #t))
+                     ;; XKB_KEY_F1
+                     (#xffbe
+                      (tinywl-cycle-focus-next-view server))
+                     ;; default
+                     (_ #f))))
+       (bool->cstdbool result)))
+   `(,uint32)))
+
+(define* (gwwm-run #:key (startup-cmd #f)
+                         (log-level   'wlr-log-error)
+                         (handle-kb   make-handle-keybinding))
+  (wlr-log-init log-level)
+  (tinywl-run startup-cmd handle-kb))
 
 (define (check)
-  (run 'wlr-error))
+  (gwwm-run #:startup-cmd "alacritty"
+            #:log-level 'wlr-log-debug))
